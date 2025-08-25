@@ -31,23 +31,46 @@ def run_step(step_name, capture_output=False):
             run_function = getattr(step_module, run_function_name)
             
             if capture_output:
-                # Capture output to extract count
+                # Capture output while also displaying it to console
                 import io
                 import contextlib
-                f = io.StringIO()
-                with contextlib.redirect_stdout(f):
+                import sys
+                
+                # Create a custom stream that writes to both console and buffer
+                class TeeOutput:
+                    def __init__(self, original_stdout):
+                        self.original_stdout = original_stdout
+                        self.buffer = io.StringIO()
+                    
+                    def write(self, text):
+                        self.original_stdout.write(text)
+                        self.buffer.write(text)
+                    
+                    def flush(self):
+                        self.original_stdout.flush()
+                        self.buffer.flush()
+                
+                # Replace stdout with our tee stream
+                original_stdout = sys.stdout
+                tee_output = TeeOutput(original_stdout)
+                sys.stdout = tee_output
+                
+                try:
                     success = run_function()
-                output = f.getvalue()
-                
-                # Extract count based on step
-                count = extract_count_from_output(step_name, output)
-                
-                if success:
-                    print(f"✅ {step_name} completed successfully")
-                    return True, count
-                else:
-                    print(f"❌ {step_name} failed")
-                    return False, None
+                    output = tee_output.buffer.getvalue()
+                    
+                    # Extract count based on step
+                    count = extract_count_from_output(step_name, output)
+                    
+                    if success:
+                        print(f"✅ {step_name} completed successfully")
+                        return True, count
+                    else:
+                        print(f"❌ {step_name} failed")
+                        return False, None
+                finally:
+                    # Restore original stdout
+                    sys.stdout = original_stdout
             else:
                 success = run_function()
                 if success:
@@ -67,6 +90,7 @@ def run_step(step_name, capture_output=False):
 def extract_count_from_output(step_name, output):
     """
     Extract count from step output based on step name
+    Only Steps 5-8 have count patterns to extract
     """
     count_patterns = {
         "Step5": "Final count: ",
@@ -74,6 +98,10 @@ def extract_count_from_output(step_name, output):
         "Step7": "Final count: ",
         "Step8": "Total rectangles detected: "
     }
+    
+    # Only extract counts for Steps 5-8
+    if step_name not in count_patterns:
+        return None
     
     pattern = count_patterns.get(step_name)
     if not pattern:
@@ -171,13 +199,13 @@ def main():
     
     # Run each step in sequence
     for step in steps:
-        # For Steps 5-8, capture output to extract counts
-        capture_output = step in ["Step5", "Step6", "Step7", "Step8"]
+        # Capture output for all steps to show progress and extract counts from Steps 5-8
+        capture_output = True
         success, count = run_step(step, capture_output)
         
         if success:
             successful_steps += 1
-            # Store count if captured
+            # Store count if captured (only for Steps 5-8)
             if count is not None:
                 step_descriptions = {
                     "Step5": "blue_X_shapes",
