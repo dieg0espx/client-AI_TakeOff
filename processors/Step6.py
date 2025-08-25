@@ -413,6 +413,34 @@ def process_svg_colors():
         print(f"Phase 3 error: {e}")
         print("Note: Make sure cairosvg is installed: pip install cairosvg")
 
+def run_step6():
+    """
+    Run Step6 processing - detect red squares
+    """
+    try:
+        # Get the current working directory to determine the correct paths
+        current_dir = os.getcwd()
+        
+        # If we're in the processors directory, use relative paths
+        if current_dir.endswith('processors'):
+            input_svg = "../files/Step4.svg"
+            output_svg = "../files/Step6.svg"
+            output_results = "../files/Step6-results.png"
+        else:
+            # If we're in the server directory (when called from pipeline), use direct paths
+            input_svg = "files/Step4.svg"
+            output_svg = "files/Step6.svg"
+            output_results = "files/Step6-results.png"
+        
+        # Run full SVG processing pipeline
+        process_svg_colors()
+        
+        return True
+        
+    except Exception as e:
+        print(f"Error in processing: {e}")
+        return False
+
 def main():
     parser = argparse.ArgumentParser(description='Contour-based Red Square Detection (#fb0505)')
     parser.add_argument('--source', type=str, default='Step6.svg',

@@ -409,6 +409,39 @@ def process_svg_colors():
     print("Z-shaped paths converted to squares/rectangles")
     print(f"Output saved to: {output_svg}")
 
+def run_step8():
+    """
+    Run Step8 processing - detect green rectangles
+    """
+    try:
+        # Get the current working directory to determine the correct paths
+        current_dir = os.getcwd()
+        
+        # If we're in the processors directory, use relative paths
+        if current_dir.endswith('processors'):
+            input_svg = "../files/Step4.svg"
+            output_svg = "../files/Step8.svg"
+            output_results = "../files/Step8-results.png"
+        else:
+            # If we're in the server directory (when called from pipeline), use direct paths
+            input_svg = "files/Step4.svg"
+            output_svg = "files/Step8.svg"
+            output_results = "files/Step8-results.png"
+        
+        # First process SVG colors and convert paths to rectangles
+        process_svg_colors()
+        
+        # Then detect green rectangles on the processed SVG
+        print(f"Detecting green rectangles in: {output_svg}")
+        count = detect_green_rectangles(output_svg, output_results)
+        print(f"\nFinal count: {count} green rectangles")
+        
+        return True
+        
+    except Exception as e:
+        print(f"Error in processing: {e}")
+        return False
+
 def main():
     parser = argparse.ArgumentParser(description='Contour-based Green Rectangle Detection')
     parser.add_argument('--source', type=str, default='test/test.png',
