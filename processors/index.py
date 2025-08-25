@@ -4,7 +4,7 @@ import importlib.util
 import json
 from pathlib import Path
 
-def run_step(step_name):
+def run_step(step_name, capture_output=False):
     """
     Dynamically import and run a processing step
     """
@@ -14,7 +14,7 @@ def run_step(step_name):
         
         if not os.path.exists(step_file):
             print(f"Step file {step_file} not found. Skipping...")
-            return False
+            return False, None
         
         print(f"\n{'='*50}")
         print(f"Running {step_name}...")
@@ -29,89 +29,67 @@ def run_step(step_name):
         run_function_name = f'run_{step_name.lower()}'
         if hasattr(step_module, run_function_name):
             run_function = getattr(step_module, run_function_name)
-            success = run_function()
-            if success:
-                print(f"✅ {step_name} completed successfully")
-                return True
+            
+            if capture_output:
+                # Capture output to extract count
+                import io
+                import contextlib
+                f = io.StringIO()
+                with contextlib.redirect_stdout(f):
+                    success = run_function()
+                output = f.getvalue()
+                
+                # Extract count based on step
+                count = extract_count_from_output(step_name, output)
+                
+                if success:
+                    print(f"✅ {step_name} completed successfully")
+                    return True, count
+                else:
+                    print(f"❌ {step_name} failed")
+                    return False, None
             else:
-                print(f"❌ {step_name} failed")
-                return False
+                success = run_function()
+                if success:
+                    print(f"✅ {step_name} completed successfully")
+                    return True, None
+                else:
+                    print(f"❌ {step_name} failed")
+                    return False, None
         else:
             print(f"⚠️  No run function found for {step_name}")
-            return False
+            return False, None
         
     except Exception as e:
         print(f"❌ Error running {step_name}: {str(e)}")
-        return False
+        return False, None
 
-def collect_step_counts():
+def extract_count_from_output(step_name, output):
     """
-    Collect counts from Steps 5-8 by running them and capturing their output
+    Extract count from step output based on step name
     """
-    print(f"\n{'='*50}")
-    print("📊 Collecting counts from Steps 5-8...")
-    print(f"{'='*50}")
+    count_patterns = {
+        "Step5": "Final count: ",
+        "Step6": "Total squares detected: ",
+        "Step7": "Final count: ",
+        "Step8": "Total rectangles detected: "
+    }
     
-    step_counts = {}
+    pattern = count_patterns.get(step_name)
+    if not pattern:
+        return None
     
-    # Define the counting steps and their expected output patterns
-    counting_steps = [
-        ("Step5", "blue X shapes", "Final count: "),
-        ("Step6", "red squares", "Total squares detected: "),
-        ("Step7", "pink shapes", "Final count: "),
-        ("Step8", "green rectangles", "Total rectangles detected: ")
-    ]
+    for line in output.split('\n'):
+        if pattern in line:
+            try:
+                count = int(line.split(pattern)[1].split()[0])
+                return count
+            except (IndexError, ValueError):
+                continue
     
-    for step_name, description, count_pattern in counting_steps:
-        try:
-            print(f"\n🔍 Running {step_name} to count {description}...")
-            
-            # Import and run the step
-            step_file = f"processors/{step_name}.py"
-            spec = importlib.util.spec_from_file_location(step_name, step_file)
-            step_module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(step_module)
-            
-            # Capture the output by redirecting stdout temporarily
-            import io
-            import contextlib
-            
-            # Capture stdout to get the count
-            f = io.StringIO()
-            with contextlib.redirect_stdout(f):
-                # Run the step using the run function
-                run_function_name = f'run_{step_name.lower()}'
-                if hasattr(step_module, run_function_name):
-                    run_function = getattr(step_module, run_function_name)
-                    run_function()
-                else:
-                    print(f"⚠️  Could not find run function for {step_name}")
-                    continue
-            
-            # Get the captured output
-            output = f.getvalue()
-            
-            # Extract the count from the output
-            count = None
-            for line in output.split('\n'):
-                if count_pattern in line:
-                    # Extract the number from the line
-                    try:
-                        count = int(line.split(count_pattern)[1].split()[0])
-                        break
-                    except (IndexError, ValueError):
-                        continue
-            
-            if count is not None:
-                step_counts[f"{step_name.lower()}_{description.replace(' ', '_')}"] = count
-                print(f"✅ {step_name}: {count} {description}")
-            else:
-                print(f"⚠️  Could not extract count from {step_name}")
-                
-        except Exception as e:
-            print(f"❌ Error collecting count from {step_name}: {str(e)}")
-    
-    return step_counts
+    return None
+
+
 
 def update_data_json(step_counts):
     """
@@ -189,11 +167,26 @@ def main():
     
     successful_steps = 0
     total_steps = len(steps)
+    step_counts = {}
     
     # Run each step in sequence
     for step in steps:
-        if run_step(step):
+        # For Steps 5-8, capture output to extract counts
+        capture_output = step in ["Step5", "Step6", "Step7", "Step8"]
+        success, count = run_step(step, capture_output)
+        
+        if success:
             successful_steps += 1
+            # Store count if captured
+            if count is not None:
+                step_descriptions = {
+                    "Step5": "blue_X_shapes",
+                    "Step6": "red_squares", 
+                    "Step7": "pink_shapes",
+                    "Step8": "green_rectangles"
+                }
+                step_number = step.lower().replace("step", "step")
+                step_counts[f"{step_number}_{step_descriptions[step]}"] = count
         else:
             print(f"⚠️  Pipeline stopped due to failure in {step}")
             break
@@ -207,11 +200,8 @@ def main():
     if successful_steps == total_steps:
         print("🎉 All steps completed successfully!")
         
-        # Collect counts from Steps 5-8
-        step_counts = collect_step_counts()
-        
+        # Update data.json with the collected counts
         if step_counts:
-            # Update data.json with the counts
             if update_data_json(step_counts):
                 print("✅ Step counts successfully stored in data.json")
             else:
