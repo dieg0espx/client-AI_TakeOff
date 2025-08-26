@@ -304,12 +304,8 @@ def process_svg_colors(input_svg, output_svg):
             else:
                 return '#202124'  # Replace others with dark gray
         
-        # Replace colors for pink-only version
+        # Replace colors for pink-only version (intermediate step)
         pink_only_content = re.sub(r'#([0-9a-fA-F]{6})', keep_only_pink, content)
-        
-        # Write the pink-only version
-        with open('image_pink_only.svg', 'w', encoding='utf-8') as file:
-            file.write(pink_only_content)
         
         # Create second output: filled shapes version
         # Find all hex color codes (#xxxxxx)
@@ -369,6 +365,39 @@ def process_svg_colors(input_svg, output_svg):
         print(f"Error: Could not find input file {input_svg}")
     except Exception as e:
         print(f"Error processing SVG: {e}")
+
+def run_step7():
+    """
+    Run Step7 processing - detect pink shapes
+    """
+    try:
+        # Get the current working directory to determine the correct paths
+        current_dir = os.getcwd()
+        
+        # If we're in the processors directory, use relative paths
+        if current_dir.endswith('processors'):
+            input_svg = "../files/Step4.svg"
+            output_svg = "../files/Step7.svg"
+            output_results = "../files/Step7-results.png"
+        else:
+            # If we're in the server directory (when called from pipeline), use direct paths
+            input_svg = "files/Step4.svg"
+            output_svg = "files/Step7.svg"
+            output_results = "files/Step7-results.png"
+        
+        # First process SVG colors
+        process_svg_colors(input_svg, output_svg)
+        
+        # Then detect pink shapes on the processed SVG
+        print(f"Detecting pink shapes in: {output_svg}")
+        count = detect_pink_shapes(output_svg, output_results)
+        print(f"\nFinal count: {count} pink shapes")
+        
+        return True
+        
+    except Exception as e:
+        print(f"Error in processing: {e}")
+        return False
 
 def main():
     parser = argparse.ArgumentParser(description='Contour-based Pink Shape Detection')

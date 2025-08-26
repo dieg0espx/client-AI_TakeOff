@@ -21,6 +21,9 @@ from utils.config_manager import config_manager
 # Import the PDF to SVG converter
 from pdf_to_svg_converter import ConvertioConverter
 
+# Import the PDF text extractor
+from api.pdf_text_extractor import extract_text_from_pdf
+
 # Import the processing pipeline
 from processors.index import main as run_pipeline
 
@@ -60,25 +63,112 @@ async def health_check():
 
 # AI-Takeoff specific endpoint
 @app.get("/AI-Takeoff/{upload_id}")
-async def get_ai_takeoff_result(upload_id: str, background_tasks: BackgroundTasks = None):
+async def get_ai_takeoff_result(upload_id: str, background_tasks: BackgroundTasks = None, sync: bool = True):
     # Store the Google Drive file ID in JSON as google_drive_file_id
     config_manager.set_file_id(upload_id)
     
     print(f"🔍 AI-Takeoff Request for upload_id: {upload_id}")
     print(f"📝 Stored Google Drive file ID in JSON as google_drive_file_id: {upload_id}")
     
-    # Start background processing
-    if background_tasks:
-        background_tasks.add_task(process_ai_takeoff, upload_id)
+    # Force synchronous processing by default, or if sync=True
+    if sync:
+        print(f"🔄 Running in synchronous mode...")
+        return await process_ai_takeoff_sync(upload_id)
+    else:
+        # Start background processing
+        if background_tasks:
+            background_tasks.add_task(process_ai_takeoff, upload_id)
+            
+            return {
+                "id": upload_id,
+                "status": "processing",
+                "message": "AI-Takeoff processing started."
+            }
+        else:
+            # Fallback to synchronous processing
+            return await process_ai_takeoff_sync(upload_id)
+
+# Extract text from PDF endpoint
+@app.get("/extract-text/{upload_id}")
+async def extract_pdf_text(upload_id: str):
+    """Extract text from the PDF file and print to console"""
+    try:
+        # Store the Google Drive file ID
+        config_manager.set_file_id(upload_id)
         
+        print(f"🔍 Text extraction request for upload_id: {upload_id}")
+        
+        # Download the PDF first
+        file_path = download_pdf_from_drive(upload_id)
+        print(f"📄 PDF downloaded successfully to: {file_path}")
+        
+        # Extract text from the PDF
+        extracted_text = extract_text_from_pdf(file_path)
+        
+        if extracted_text:
+            return {
+                "id": upload_id,
+                "status": "success",
+                "message": "Text extracted successfully and printed to console",
+                "text_length": len(extracted_text),
+                "pdf_path": file_path
+            }
+        else:
+            return {
+                "id": upload_id,
+                "status": "no_text",
+                "message": "No text was extracted from the PDF",
+                "pdf_path": file_path
+            }
+            
+    except Exception as e:
+        print(f"❌ Error in text extraction: {e}")
         return {
             "id": upload_id,
-            "status": "processing",
-            "message": "AI-Takeoff processing started."
+            "status": "error",
+            "error": str(e),
+            "message": "Failed to extract text from PDF"
         }
-    else:
-        # Fallback to synchronous processing
-        return await process_ai_takeoff_sync(upload_id)
+
+# Get results endpoint
+@app.get("/AI-Takeoff/{upload_id}/results")
+async def get_ai_takeoff_results(upload_id: str):
+    """Get the results from data.json for a specific upload_id"""
+    data_json_path = os.path.join('data.json')
+    
+    if not os.path.exists(data_json_path):
+        return {
+            "id": upload_id,
+            "status": "not_found",
+            "message": "No results found. Processing may not be complete."
+        }
+    
+    try:
+        with open(data_json_path, 'r') as f:
+            import json
+            data_results = json.load(f)
+        
+        # Check if this result belongs to the requested upload_id
+        if data_results.get('upload_id') == upload_id:
+            return {
+                "id": upload_id,
+                "status": "completed",
+                "results": data_results
+            }
+        else:
+            return {
+                "id": upload_id,
+                "status": "not_found",
+                "message": "Results not found for this upload_id. Processing may not be complete."
+            }
+            
+    except Exception as e:
+        return {
+            "id": upload_id,
+            "status": "error",
+            "error": str(e),
+            "message": "Error reading results file"
+        }
 
 async def process_ai_takeoff(upload_id: str):
     """Process AI-Takeoff request"""
@@ -133,6 +223,24 @@ async def process_ai_takeoff(upload_id: str):
             print("⚠️  Skipping SVG conversion - CONVERTIO_API_KEY not set")
         
         print(f"✅ AI-Takeoff processing completed for upload_id: {upload_id}")
+        
+        # Update data.json with the upload_id for tracking
+        data_json_path = os.path.join('data.json')
+        if os.path.exists(data_json_path):
+            try:
+                with open(data_json_path, 'r') as f:
+                    import json
+                    data_results = json.load(f)
+                
+                # Add upload_id to the results
+                data_results['upload_id'] = upload_id
+                
+                with open(data_json_path, 'w') as f:
+                    json.dump(data_results, f, indent=4)
+                
+                print(f"✅ Updated data.json with upload_id: {upload_id}")
+            except Exception as e:
+                print(f"❌ Error updating data.json: {e}")
         
     except Exception as e:
         print(f"❌ Error in AI-Takeoff processing: {e}")
@@ -191,15 +299,45 @@ async def process_ai_takeoff_sync(upload_id: str):
         # Get file sizes
         pdf_size = os.path.getsize(file_path) if os.path.exists(file_path) else 0
         
-        result = {
-            "id": upload_id,
-            "status": "completed",
-            "pdf_path": file_path,
-            "pdf_size": pdf_size,
-            "svg_path": svg_path,
-            "svg_size": svg_size,
-            "message": "PDF downloaded and converted to SVG successfully"
-        }
+        # Read the data.json file that was generated by the pipeline
+        data_json_path = os.path.join('data.json')
+        if os.path.exists(data_json_path):
+            try:
+                with open(data_json_path, 'r') as f:
+                    import json
+                    data_results = json.load(f)
+                
+                result = {
+                    "id": upload_id,
+                    "status": "completed",
+                    "pdf_path": file_path,
+                    "pdf_size": pdf_size,
+                    "svg_path": svg_path,
+                    "svg_size": svg_size,
+                    "message": "AI-Takeoff processing completed successfully",
+                    "results": data_results
+                }
+            except Exception as e:
+                print(f"❌ Error reading data.json: {e}")
+                result = {
+                    "id": upload_id,
+                    "status": "completed",
+                    "pdf_path": file_path,
+                    "pdf_size": pdf_size,
+                    "svg_path": svg_path,
+                    "svg_size": svg_size,
+                    "message": "PDF downloaded and converted to SVG successfully, but could not read results"
+                }
+        else:
+            result = {
+                "id": upload_id,
+                "status": "completed",
+                "pdf_path": file_path,
+                "pdf_size": pdf_size,
+                "svg_path": svg_path,
+                "svg_size": svg_size,
+                "message": "PDF downloaded and converted to SVG successfully, but no results file found"
+            }
         
     except Exception as e:
         print(f"❌ Error downloading PDF: {e}")

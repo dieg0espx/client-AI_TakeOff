@@ -225,6 +225,39 @@ def process_svg_colors(input_svg, output_svg):
     except Exception as e:
         print(f"Error processing SVG: {e}")
 
+def run_step5():
+    """
+    Run Step5 processing - detect blue X shapes
+    """
+    try:
+        # Get the current working directory to determine the correct paths
+        current_dir = os.getcwd()
+        
+        # If we're in the processors directory, use relative paths
+        if current_dir.endswith('processors'):
+            input_svg = "../files/Step4.svg"
+            output_svg = "../files/Step5.svg"
+            output_results = "../files/Step5-results.svg"
+        else:
+            # If we're in the server directory (when called from pipeline), use direct paths
+            input_svg = "files/Step4.svg"
+            output_svg = "files/Step5.svg"
+            output_results = "files/Step5-results.svg"
+        
+        # First process SVG colors
+        process_svg_colors(input_svg, output_svg)
+        
+        # Then detect blue X shapes on the processed SVG
+        print(f"Detecting blue X shapes in: {output_svg}")
+        count = detect_blue_x_shapes(output_svg, output_results)
+        print(f"\nFinal count: {count} blue X shapes")
+        
+        return True
+        
+    except Exception as e:
+        print(f"Error in processing: {e}")
+        return False
+
 def main():
     parser = argparse.ArgumentParser(description='Contour-based Blue X Detection')
     parser.add_argument('--source', type=str, default='test-images/test1.png',
