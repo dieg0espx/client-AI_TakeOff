@@ -5,6 +5,7 @@
 1. A Google Cloud Console project
 2. Google Drive API enabled
 3. OAuth 2.0 credentials configured
+4. OpenAI API key (for text enhancement feature)
 
 ## Setup Steps
 
@@ -27,18 +28,28 @@
    - Your production domain (for production)
 6. Copy the Client ID
 
-### 3. Environment Variables
+### 3. OpenAI API Setup
+
+1. Go to [OpenAI Platform](https://platform.openai.com/)
+2. Create an account or sign in
+3. Navigate to "API Keys" section
+4. Create a new API key
+5. Copy the API key
+
+### 4. Environment Variables
 
 Create a `.env.local` file in the root directory with:
 
 ```env
+# Google OAuth Configuration
 NEXT_PUBLIC_GOOGLE_CLIENT_ID=your-actual-client-id-here
+
+# API Configuration
+NEXT_PUBLIC_API_URL=http://127.0.0.1:5000
+
+# OpenAI Configuration
+OPENAI_API_KEY=your-openai-api-key-here
 ```
-
-### 4. API Scopes
-
-The application requires the following Google Drive API scopes:
-- `https://www.googleapis.com/auth/drive.file` - Access to files created by the app
 
 ### 5. Server Configuration
 
@@ -52,6 +63,8 @@ Make sure your AI processing server is running at `http://127.0.0.1:5000` or upd
 - File sharing for AI processing
 - Company and jobsite selection
 - Real-time processing logs
+- **NEW: Extracted text display and AI enhancement**
+- **NEW: OpenAI-powered text rewriting and professional formatting**
 
 ## Usage
 
@@ -59,4 +72,19 @@ Make sure your AI processing server is running at `http://127.0.0.1:5000` or upd
 2. Select a PDF file
 3. Choose company and jobsite
 4. Upload and process the file
-5. View analysis results
+5. View analysis results including:
+   - Processing summary with metadata
+   - Extracted text from the PDF
+   - AI-enhanced version of the text (click "Enhance with AI")
+   - Generated images and visual analysis
+   - Shape detection statistics
+   - Complete raw data
+
+## New Features
+
+### Extracted Text Enhancement
+- Displays raw text extracted from PDF documents
+- "Enhance with AI" button to rewrite text using OpenAI
+- Professional formatting and improved readability
+- Construction and engineering-focused analysis
+- Structured output with clear sections and recommendations

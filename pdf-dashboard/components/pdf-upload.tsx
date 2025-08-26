@@ -174,12 +174,8 @@ export function PdfUpload({ onFileUpload }: PdfUploadProps) {
       if (serverResponse.data.file_name !== '') {
         console.log('GOT SERVER RESPONSE')
         console.log(serverResponse.data)
-        // Call the original onFileUpload callback with the processed result
-        onFileUpload(selectedFile, {
-          id: serverResponse.data.id || uploadResult.id,
-          status: serverResponse.data.status || "uploaded",
-          message: serverResponse.data.result || "File uploaded successfully for AI processing"
-        })
+        // Call the original onFileUpload callback with the complete server response
+        onFileUpload(selectedFile, serverResponse.data)
       } else {
         setError(serverResponse.data.error || "Processing failed")
       }
