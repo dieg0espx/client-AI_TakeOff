@@ -91,11 +91,8 @@ def store_text_in_data_json(extracted_text: str, pdf_path: str):
         else:
             data = {}
         
-        # Update the data with the extracted text
+        # Update the data with only the extracted text
         data['extracted_text'] = extracted_text
-        data['pdf_file_path'] = pdf_path
-        data['pdf_file_size'] = os.path.getsize(pdf_path)
-        data['text_extraction_timestamp'] = str(datetime.datetime.now())
         
         # Write updated data back to data.json
         with open('data.json', 'w') as file:
