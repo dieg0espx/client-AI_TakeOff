@@ -3,6 +3,9 @@ import os
 import json
 from colorama import init, Fore, Style
 from PatternComponents import shores_box, frames_6x4, frames_5x4, frames_inBox, shores
+import cairosvg
+import io
+from PIL import Image
 
 def print_table(box_count, shores_count, frames6x4_count, frames5x4_count, framesinbox_count):
     # Initialize colorama
@@ -49,28 +52,9 @@ def print_table(box_count, shores_count, frames6x4_count, frames5x4_count, frame
     print(f"{'Total elements':<30} {'':^8} {total:>6}\n")
 
 def append_counts_to_json(box_count, shores_count, frames6x4_count, frames5x4_count, framesinbox_count):
-    # Load existing data from data.json
-    if os.path.exists('data.json'):
-        with open('data.json', 'r') as file:
-            try:
-                data = json.load(file)
-            except json.JSONDecodeError:
-                data = {}
-    else:
-        data = {}
-
-    # Append counts to the data
-    data['objects'] = {
-        'shores_Box': box_count,
-        'shores': shores_count,
-        'frames_6x4': frames6x4_count,
-        'frames_5x4': frames5x4_count,
-        'frames_In_Box': framesinbox_count
-    }
-
-    # Write updated data back to data.json
-    with open('data.json', 'w') as file:
-        json.dump(data, file, indent=4)
+    # This function is no longer needed as we don't store objects in data.json
+    # Keeping the function signature for compatibility but removing the JSON writing
+    pass
 
 def apply_color_to_specific_paths(input_file, output_file, red="#fb0505", blue="#0000ff", green="#70ff00", pink="#ff00cd", orange="#fb7905"):
     """
@@ -310,26 +294,28 @@ def apply_color_to_specific_paths(input_file, output_file, red="#fb0505", blue="
         with open(output_file, "w", encoding="utf-8") as file:
             file.write(modified_svg_text)
 
-        # Update data.json with the local file path
-        if os.path.exists('data.json'):
-            with open('data.json', 'r') as f:
-                try:
-                    data = json.load(f)
-                except json.JSONDecodeError:
-                    data = {}
-        else:
-            data = {}
-
-        # Add the local file path
-        data['modified_drawing'] = output_file
-
-        with open('data.json', 'w') as f:
-            json.dump(data, f, indent=4)
-
-        print("data.json updated successfully with local file path.")
+        print("SVG file updated successfully.")
 
     except Exception as e:
         print(f"Error applying colors: {e}")
+
+def svg_to_png(svg_path, png_path):
+    """Convert SVG to PNG format"""
+    try:
+        # Convert SVG to PNG bytes
+        png_data = cairosvg.svg2png(url=svg_path)
+        
+        # Convert to PIL Image
+        image = Image.open(io.BytesIO(png_data))
+        
+        # Save as PNG
+        image.save(png_path, 'PNG')
+        print(f"✅ SVG converted to PNG: {png_path}")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Error converting SVG to PNG: {e}")
+        return False
 
 def run_step4():
     """
@@ -357,9 +343,17 @@ def run_step4():
         
         apply_color_to_specific_paths(input_svg, output_svg)
         
+        # Convert SVG to PNG
+        output_png = output_svg.replace('.svg', '-results.png')
+        if svg_to_png(output_svg, output_png):
+            print(f"   - Generated PNG: {output_png}")
+        else:
+            print(f"   - Warning: PNG conversion failed")
+        
         print(f"✅ Step4 completed successfully:")
         print(f"   - Input SVG: {input_svg}")
         print(f"   - Processed SVG: {output_svg}")
+        print(f"   - Generated PNG: {output_png}")
         return True
             
     except Exception as e:

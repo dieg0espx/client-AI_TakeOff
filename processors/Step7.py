@@ -304,12 +304,8 @@ def process_svg_colors(input_svg, output_svg):
             else:
                 return '#202124'  # Replace others with dark gray
         
-        # Replace colors for pink-only version
+        # Replace colors for pink-only version (intermediate step)
         pink_only_content = re.sub(r'#([0-9a-fA-F]{6})', keep_only_pink, content)
-        
-        # Write the pink-only version
-        with open('image_pink_only.svg', 'w', encoding='utf-8') as file:
-            file.write(pink_only_content)
         
         # Create second output: filled shapes version
         # Find all hex color codes (#xxxxxx)

@@ -20,9 +20,18 @@ def run_step(step_name, capture_output=False):
         print(f"Running {step_name}...")
         print(f"{'='*50}")
         
+        # Add processors directory to Python path so step modules can import from each other
+        processors_dir = os.path.abspath("processors")
+        if processors_dir not in sys.path:
+            sys.path.insert(0, processors_dir)
+        
         # Import and run the step
         spec = importlib.util.spec_from_file_location(step_name, step_file)
         step_module = importlib.util.module_from_spec(spec)
+        
+        # Add the module to sys.modules so it can be imported by other modules
+        sys.modules[step_name] = step_module
+        
         spec.loader.exec_module(step_module)
         
         # Call the run function for the step
@@ -34,7 +43,6 @@ def run_step(step_name, capture_output=False):
                 # Capture output while also displaying it to console
                 import io
                 import contextlib
-                import sys
                 
                 # Create a custom stream that writes to both console and buffer
                 class TeeOutput:
@@ -121,7 +129,7 @@ def extract_count_from_output(step_name, output):
 
 def update_data_json(step_counts):
     """
-    Update data.json with the collected step counts
+    Update data.json with the collected step counts and Cloudinary URLs
     """
     try:
         # Read existing data.json
@@ -135,11 +143,36 @@ def update_data_json(step_counts):
         # Add step results section
         data["step_results"] = step_counts
         
+        # Upload images to Cloudinary and get URLs
+        try:
+            # Add the parent directory to sys.path to find the api module
+            parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            if parent_dir not in sys.path:
+                sys.path.insert(0, parent_dir)
+            
+            from api.cloudinary_manager import get_cloudinary_manager
+            cloudinary_manager = get_cloudinary_manager()
+            
+            if cloudinary_manager:
+                print("☁️  Uploading processing results to Cloudinary...")
+                cloudinary_urls = cloudinary_manager.upload_processing_results(step_counts)
+                
+                if cloudinary_urls:
+                    data["cloudinary_urls"] = cloudinary_urls
+                    print(f"✅ Successfully uploaded {len(cloudinary_urls)} images to Cloudinary")
+                else:
+                    print("⚠️  No images were uploaded to Cloudinary")
+            else:
+                print("⚠️  Cloudinary not configured - skipping image uploads")
+                
+        except Exception as e:
+            print(f"⚠️  Error uploading to Cloudinary: {str(e)}")
+        
         # Write back to data.json
         with open(data_file, 'w') as f:
             json.dump(data, f, indent=4)
         
-        print(f"✅ Updated {data_file} with step results")
+        print(f"✅ Updated {data_file} with step results and Cloudinary URLs")
         return True
         
     except Exception as e:
@@ -247,6 +280,10 @@ def main():
                     print("   - Step results:")
                     for step, count in data['step_results'].items():
                         print(f"     * {step}: {count}")
+                if 'cloudinary_urls' in data:
+                    print("   - Cloudinary URLs:")
+                    for step, url in data['cloudinary_urls'].items():
+                        print(f"     * {step}: {url}")
             except Exception as e:
                 print(f"⚠️  Could not read data.json: {e}")
     else:
