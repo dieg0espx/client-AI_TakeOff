@@ -21,6 +21,9 @@ from utils.config_manager import config_manager
 # Import the PDF to SVG converter
 from pdf_to_svg_converter import ConvertioConverter
 
+# Import the PDF text extractor
+from api.pdf_text_extractor import extract_text_from_pdf
+
 # Import the processing pipeline
 from processors.index import main as run_pipeline
 
@@ -84,6 +87,48 @@ async def get_ai_takeoff_result(upload_id: str, background_tasks: BackgroundTask
         else:
             # Fallback to synchronous processing
             return await process_ai_takeoff_sync(upload_id)
+
+# Extract text from PDF endpoint
+@app.get("/extract-text/{upload_id}")
+async def extract_pdf_text(upload_id: str):
+    """Extract text from the PDF file and print to console"""
+    try:
+        # Store the Google Drive file ID
+        config_manager.set_file_id(upload_id)
+        
+        print(f"🔍 Text extraction request for upload_id: {upload_id}")
+        
+        # Download the PDF first
+        file_path = download_pdf_from_drive(upload_id)
+        print(f"📄 PDF downloaded successfully to: {file_path}")
+        
+        # Extract text from the PDF
+        extracted_text = extract_text_from_pdf(file_path)
+        
+        if extracted_text:
+            return {
+                "id": upload_id,
+                "status": "success",
+                "message": "Text extracted successfully and printed to console",
+                "text_length": len(extracted_text),
+                "pdf_path": file_path
+            }
+        else:
+            return {
+                "id": upload_id,
+                "status": "no_text",
+                "message": "No text was extracted from the PDF",
+                "pdf_path": file_path
+            }
+            
+    except Exception as e:
+        print(f"❌ Error in text extraction: {e}")
+        return {
+            "id": upload_id,
+            "status": "error",
+            "error": str(e),
+            "message": "Failed to extract text from PDF"
+        }
 
 # Get results endpoint
 @app.get("/AI-Takeoff/{upload_id}/results")
