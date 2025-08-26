@@ -1,10 +1,11 @@
 import os
-import PyPDF2
-from pathlib import Path
+import json
+from pdf2image import convert_from_path
+import pytesseract
 
 def extract_text_from_pdf(pdf_path: str = None) -> str:
     """
-    Extract text from a PDF file and print it to console
+    Extract text from a PDF file using OCR and print it to console
     
     Args:
         pdf_path (str): Path to the PDF file. If None, uses 'files/original.pdf'
@@ -12,6 +13,8 @@ def extract_text_from_pdf(pdf_path: str = None) -> str:
     Returns:
         str: Extracted text from the PDF
     """
+    global extracted_text
+    
     # Default to the original.pdf file if no path provided
     if pdf_path is None:
         pdf_path = os.path.join('files', 'original.pdf')
@@ -24,64 +27,57 @@ def extract_text_from_pdf(pdf_path: str = None) -> str:
     try:
         print(f"📄 Extracting text from: {pdf_path}")
         
-        # Open the PDF file
-        with open(pdf_path, 'rb') as file:
-            # Create PDF reader object
-            pdf_reader = PyPDF2.PdfReader(file)
+        # Convert PDF to images
+        print("🔄 Converting PDF to images for OCR processing...")
+        images = convert_from_path(pdf_path)
+        
+        print(f"📊 PDF has {len(images)} pages")
+        extracted_text = ""
+        
+        # Extract text from each page using OCR
+        for i, image in enumerate(images):
+            print(f"📖 Processing page {i + 1}/{len(images)} with OCR...")
             
-            # Get number of pages
-            num_pages = len(pdf_reader.pages)
-            print(f"📊 PDF has {num_pages} pages")
+            # Extract text from image using pytesseract
+            text = pytesseract.image_to_string(image)
             
-            extracted_text = ""
-            
-            # Extract text from each page
-            for page_num in range(num_pages):
-                print(f"📖 Processing page {page_num + 1}/{num_pages}")
-                
-                # Get the page
-                page = pdf_reader.pages[page_num]
-                
-                # Extract text from the page
-                page_text = page.extract_text()
-                
-                if page_text.strip():
-                    print(f"📄 Page {page_num + 1} text:")
-                    print("-" * 50)
-                    print(page_text)
-                    print("-" * 50)
-                    extracted_text += f"\n--- Page {page_num + 1} ---\n{page_text}\n"
-                else:
-                    print(f"⚠️  Page {page_num + 1} appears to be empty or contains no extractable text")
-            
-            # Print summary
-            total_chars = len(extracted_text)
-            print(f"\n📊 Text extraction summary:")
-            print(f"   - Total pages: {num_pages}")
-            print(f"   - Total characters extracted: {total_chars}")
-            print(f"   - File size: {os.path.getsize(pdf_path)} bytes")
-            
-            if total_chars == 0:
-                print("⚠️  No text was extracted. This might be a scanned document or image-based PDF.")
-            
-            return extracted_text
-            
+            if text.strip():
+                print(f"📄 Page {i + 1} extracted text:")
+                print("-" * 50)
+                print(text)
+                print("-" * 50)
+                extracted_text += f"\n--- Page {i + 1} ---\n{text}\n"
+            else:
+                print(f"⚠️  Page {i + 1} appears to be empty or contains no extractable text")
+        
+        # Print summary
+        total_chars = len(extracted_text)
+        print(f"\n📊 OCR Text extraction summary:")
+        print(f"   - Total pages: {len(images)}")
+        print(f"   - Total characters extracted: {total_chars}")
+        print(f"   - File size: {os.path.getsize(pdf_path)} bytes")
+        
+        if total_chars == 0:
+            print("⚠️  No text was extracted. This might be a scanned document with poor quality.")
+        
+        return extracted_text
+        
     except Exception as e:
         print(f"❌ Error extracting text from PDF: {str(e)}")
         return ""
 
 def main():
     """Main function to run text extraction"""
-    print("🔍 PDF Text Extractor")
+    print("🔍 PDF Text Extractor (OCR)")
     print("=" * 50)
     
     # Extract text from the original.pdf file
     text = extract_text_from_pdf()
     
     if text:
-        print("\n✅ Text extraction completed successfully!")
+        print("\n✅ OCR text extraction completed successfully!")
     else:
-        print("\n❌ Text extraction failed or no text found.")
+        print("\n❌ OCR text extraction failed or no text found.")
 
 if __name__ == "__main__":
     main()
