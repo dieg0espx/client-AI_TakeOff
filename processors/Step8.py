@@ -16,7 +16,6 @@ import io
 from PIL import Image
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-from processors.websocket_utils import sync_websocket_print
 
 
 def svg_to_image(svg_path, output_path=None):
@@ -32,22 +31,22 @@ def svg_to_image(svg_path, output_path=None):
             # Save as PNG if output path is provided
             image.save(output_path, 'PNG')
             
-            sync_websocket_print(f"SVG converted and saved as: {output_path}")
+            print(f"SVG converted and saved as: {output_path}")
         
         return image
     except Exception as e:
         
-        sync_websocket_print(f"Error converting SVG to image: {e}", "error")
+        print(f"Error converting SVG to image: {e}", "error")
         return None
 
 def detect_green_rectangles(image_path, output_path='results.png'):
     """Detect individual green rectangles using contour detection"""
     
-    sync_websocket_print(f"Processing image: {image_path}")
+    print(f"Processing image: {image_path}")
     
     # Check if input is SVG and convert if needed
     if str(image_path).lower().endswith('.svg'):
-        sync_websocket_print("Converting SVG to image for processing...")
+        print("Converting SVG to image for processing...")
         pil_image = svg_to_image(image_path)
         if pil_image is None:
             return 0
@@ -59,7 +58,7 @@ def detect_green_rectangles(image_path, output_path='results.png'):
         img = cv2.imread(str(image_path))
     
     if img is None:
-        sync_websocket_print(f"Error: Could not read image {image_path}", "error")
+        print(f"Error: Could not read image {image_path}", "error")
         return 0
     
     # Convert to HSV for better color detection
@@ -100,7 +99,7 @@ def detect_green_rectangles(image_path, output_path='results.png'):
                 if w >= 10 and h >= 10:  # Minimum size requirement
                     valid_contours.append((contour, x, y, w, h, area))
     
-    sync_websocket_print(f"Found {len(valid_contours)} initial contours")
+    print(f"Found {len(valid_contours)} initial contours")
     
     # Group nearby contours to identify individual rectangles
     if len(valid_contours) > 0:
@@ -157,7 +156,7 @@ def detect_green_rectangles(image_path, output_path='results.png'):
                         grouped_contours.append(([(contour, x, y, w, h, area)], x, y, w, h))
         
         valid_contours = grouped_contours
-        sync_websocket_print(f"Grouped into {len(valid_contours)} rectangles")
+        print(f"Grouped into {len(valid_contours)} rectangles")
     
     # Create result image by copying the original image
     result_img = img.copy()
@@ -177,7 +176,7 @@ def detect_green_rectangles(image_path, output_path='results.png'):
         cv2.putText(result_img, label, (int(x), int(y)-10), 
                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
         
-        sync_websocket_print(f"{i+1}: Size={w:.1f}x{h:.1f}, Contours={len(contours_group)}")
+        print(f"{i+1}: Size={w:.1f}x{h:.1f}, Contours={len(contours_group)}")
     
     # Save result
     if output_path.lower().endswith('.svg'):
@@ -186,11 +185,11 @@ def detect_green_rectangles(image_path, output_path='results.png'):
         # For now, save as PNG with SVG extension (you might want to convert back to SVG)
         png_path = output_path.replace('.svg', '.png')
         cv2.imwrite(png_path, result_img)
-        sync_websocket_print(f"Result saved as: {png_path} (PNG format)")
+        print(f"Result saved as: {png_path} (PNG format)")
     else:
         cv2.imwrite(output_path, result_img)
-        sync_websocket_print(f"Result saved as: {output_path}")
-    sync_websocket_print(f"Total rectangles detected: {len(valid_contours)}")
+        print(f"Result saved as: {output_path}")
+    print(f"Total rectangles detected: {len(valid_contours)}")
     
     return len(valid_contours)
 
@@ -411,11 +410,11 @@ def process_svg_colors():
         file.write(processed_content)
     
     
-    sync_websocket_print("SVG processing completed!")
-    sync_websocket_print("Original colors replaced with #202124 (except #70ff00)")
-    sync_websocket_print("#70ff00 stroke elements converted to filled shapes")
-    sync_websocket_print("Z-shaped paths converted to squares/rectangles")
-    sync_websocket_print(f"Output saved to: {output_svg}")
+    print("SVG processing completed!")
+    print("Original colors replaced with #202124 (except #70ff00)")
+    print("#70ff00 stroke elements converted to filled shapes")
+    print("Z-shaped paths converted to squares/rectangles")
+    print(f"Output saved to: {output_svg}")
 
 def run_step8():
     """
@@ -441,15 +440,15 @@ def run_step8():
         
         # Then detect green rectangles on the processed SVG
         
-        sync_websocket_print(f"Detecting green rectangles in: {output_svg}")
+        print(f"Detecting green rectangles in: {output_svg}")
         count = detect_green_rectangles(output_svg, output_results)
-        sync_websocket_print(f"\nFinal count: {count} green rectangles")
+        print(f"\nFinal count: {count} green rectangles")
         
         return True
         
     except Exception as e:
         
-        sync_websocket_print(f"Error in processing: {e}", "error")
+        print(f"Error in processing: {e}", "error")
         return False
 
 def main():
@@ -464,14 +463,13 @@ def main():
     # Check if source exists
     source_path = Path(args.source)
     if not source_path.exists():
-            
-            sync_websocket_print(f"Error: Source not found at {source_path}", "error")
+        print(f"Error: Source not found at {source_path}", "error")
         return
     
     # Detect rectangles
     count = detect_green_rectangles(source_path, args.output)
     
-    sync_websocket_print(f"\nFinal count: {count} green rectangles")
+    print(f"\nFinal count: {count} green rectangles")
 
 if __name__ == "__main__":
     try:
@@ -494,10 +492,10 @@ if __name__ == "__main__":
         
         # Then detect green rectangles on the processed SVG
         
-        sync_websocket_print(f"Detecting green rectangles in: {output_svg}")
+        print(f"Detecting green rectangles in: {output_svg}")
         count = detect_green_rectangles(output_svg, output_results)
-        sync_websocket_print(f"\nFinal count: {count} green rectangles")
+        print(f"\nFinal count: {count} green rectangles")
         
     except Exception as e:
         
-        sync_websocket_print(f"Error in processing: {e}", "error")
+        print(f"Error in processing: {e}", "error")

@@ -1,49 +1,19 @@
 # source venv/bin/activate
 # uvicorn main:app --host 0.0.0.0 --port 5001 --reload
 
-from fastapi import FastAPI, BackgroundTasks, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import sys
 import os
 import json
 import asyncio
-from typing import Set
 from dotenv import load_dotenv
 from datetime import datetime
 
 # Load environment variables from .env file
 load_dotenv()
 
-# WebSocket Connection Manager
-class WebSocketManager:
-    def __init__(self):
-        self.active_connections: Set[WebSocket] = set()
-    
-    async def connect(self, websocket: WebSocket):
-        await websocket.accept()
-        self.active_connections.add(websocket)
-        print(f"🔌 File-processing WebSocket client connected. Total clients: {len(self.active_connections)}")
-    
-    def disconnect(self, websocket: WebSocket):
-        self.active_connections.discard(websocket)
-        print(f"🔌 File-processing WebSocket client disconnected. Total clients: {len(self.active_connections)}")
-    
-    async def send_to_all(self, message: str):
-        if self.active_connections:
-            disconnected = set()
-            for connection in self.active_connections:
-                try:
-                    await connection.send_text(message)
-                except:
-                    disconnected.add(connection)
-            
-            # Remove disconnected clients
-            for connection in disconnected:
-                self.active_connections.discard(connection)
-
-# Global WebSocket manager instance
-websocket_manager = WebSocketManager()
 
 # Add the api directory to the Python path
 sys.path.append(os.path.join(os.path.dirname(__file__), 'api'))
@@ -70,34 +40,10 @@ app = FastAPI(
 
 # Custom logging function
 async def log_to_client(upload_id: str, message: str, log_type: str = "info"):
-    """Log message to console and WebSocket clients"""
-    # Print to console (existing behavior)
+    """Log message to console"""
     print(message)
-    
-    # Send to WebSocket clients if any are connected
-    if websocket_manager.active_connections:
-        timestamp = datetime.now().strftime("%H:%M:%S")
-        formatted_message = f"[{timestamp}] {message}"
-        await websocket_manager.send_to_all(formatted_message)
 
 
-# Synchronous version for use in non-async contexts
-def sync_websocket_print(message: str):
-    """Synchronous print that sends to WebSocket clients"""
-    # Print to console (existing behavior)
-    print(message)
-    
-    # Send to WebSocket clients if any are connected (fire and forget)
-    if websocket_manager.active_connections:
-        timestamp = datetime.now().strftime("%H:%M:%S")
-        formatted_message = f"[{timestamp}] {message}"
-        # Use asyncio.create_task to send without blocking
-        try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                asyncio.create_task(websocket_manager.send_to_all(formatted_message))
-        except:
-            pass
 
 # Modified pipeline runner with logging support
 def run_pipeline_with_logging(upload_id: str):
@@ -130,12 +76,12 @@ def run_pipeline_with_logging(upload_id: str):
             step_file = f"processors/{step}.py"
             
             if not os.path.exists(step_file):
-                sync_websocket_print(f"Step file {step_file} not found. Skipping...")
+                print(f"Step file {step_file} not found. Skipping...")
                 continue
             
-            sync_websocket_print(f"\n{'='*50}")
-            sync_websocket_print(f"Running {step}...")
-            sync_websocket_print(f"{'='*50}")
+            print(f"\n{'='*50}")
+            print(f"Running {step}...")
+            print(f"{'='*50}")
             
             # Add processors directory to Python path
             processors_dir = os.path.abspath("processors")
@@ -155,37 +101,37 @@ def run_pipeline_with_logging(upload_id: str):
                 
                 if success:
                     successful_steps += 1
-                    sync_websocket_print(f"✅ {step} completed successfully")
+                    print(f"✅ {step} completed successfully")
                 else:
-                    sync_websocket_print(f"❌ {step} failed")
+                    print(f"❌ {step} failed")
                     break
             else:
-                sync_websocket_print(f"⚠️  No run function found for {step}")
+                print(f"⚠️  No run function found for {step}")
                 break
                 
         except Exception as e:
-            sync_websocket_print(f"❌ Error running {step}: {str(e)}")
+            print(f"❌ Error running {step}: {str(e)}")
             break
     
     # Summary
-    sync_websocket_print(f"\n{'='*60}")
-    sync_websocket_print(f"📊 Processing Summary")
-    sync_websocket_print(f"{'='*60}")
-    sync_websocket_print(f"Steps completed: {successful_steps}/{total_steps}")
+    print(f"\n{'='*60}")
+    print(f"📊 Processing Summary")
+    print(f"{'='*60}")
+    print(f"Steps completed: {successful_steps}/{total_steps}")
     
     if successful_steps == total_steps:
-        sync_websocket_print(f"🎉 All steps completed successfully!")
+        print(f"🎉 All steps completed successfully!")
     else:
-        sync_websocket_print(f"⚠️  Pipeline completed with some failures")
+        print(f"⚠️  Pipeline completed with some failures")
     
     return successful_steps == total_steps
 
 # Initialize the PDF to SVG converter
 try:
     converter = ConvertioConverter()
-    sync_websocket_print("✅ PDF to SVG converter initialized successfully")
+    print("✅ PDF to SVG converter initialized successfully")
 except ValueError as e:
-    sync_websocket_print(f"⚠️  Warning: {e}. SVG conversion will not work.")
+    print(f"⚠️  Warning: {e}. SVG conversion will not work.")
     converter = None
 
 # Add CORS middleware
@@ -201,37 +147,6 @@ app.add_middleware(
 @app.get("/")
 async def root():
     return {"message": "AI-Takeoff Server is running!", "status": "running"}
-
-
-# WebSocket endpoint for file processing logs
-@app.websocket("/File-processing")
-async def websocket_file_processing(websocket: WebSocket):
-    await websocket_manager.connect(websocket)
-    
-    try:
-        # Send welcome message
-        welcome_msg = f"[{datetime.now().strftime('%H:%M:%S')}] 🚀 Connected to File-processing WebSocket. You will receive all project logs here."
-        await websocket.send_text(welcome_msg)
-        
-        # Keep connection alive and send periodic time updates
-        while True:
-            try:
-                # Send current time every second when no processing is happening
-                current_time = datetime.now().strftime("%H:%M:%S")
-                await websocket.send_text("---")
-                
-                # Wait for 1 second before sending the next update
-                await asyncio.sleep(1)
-                
-            except WebSocketDisconnect:
-                break
-                
-    except WebSocketDisconnect:
-        pass
-    except Exception as e:
-        print(f"❌ File-processing WebSocket error: {e}")
-    finally:
-        websocket_manager.disconnect(websocket)
 
 
 # AI-Takeoff specific endpoint

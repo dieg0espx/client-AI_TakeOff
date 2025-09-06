@@ -3,7 +3,6 @@ import os
 import json
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-from processors.websocket_utils import sync_websocket_print
 
 def find_and_remove_duplicate_paths(svg_path, output_path):
     try:
@@ -36,7 +35,7 @@ def find_and_remove_duplicate_paths(svg_path, output_path):
                 found_duplicates = True
 
         if not found_duplicates:
-            sync_websocket_print("No duplicate paths found")
+            print("No duplicate paths found")
             return svg_text
 
         # Remove duplicate paths
@@ -60,7 +59,7 @@ def find_and_remove_duplicate_paths(svg_path, output_path):
         with open(output_path, "w", encoding="utf-8") as file:
             file.write(modified_svg_text)
 
-        sync_websocket_print(f"Removed {len(paths_to_remove)} duplicate paths")
+        print(f"Removed {len(paths_to_remove)} duplicate paths")
         
         # Print line counts for verification
         original_lines = len(svg_text.split('\n'))
@@ -69,7 +68,7 @@ def find_and_remove_duplicate_paths(svg_path, output_path):
         return modified_svg_text
 
     except Exception as e:
-        sync_websocket_print(f"Error handling duplicate paths: {e}")
+        print(f"Error handling duplicate paths: {e}")
         return svg_text
 
 
@@ -93,20 +92,20 @@ def run_step1():
         
         # Check if input file exists
         if not os.path.exists(input_svg):
-            sync_websocket_print(f"Error: Input file '{input_svg}' not found!")
-            sync_websocket_print(f"Current working directory: {os.getcwd()}")
-            sync_websocket_print(f"Tried path: {input_svg}")
+            print(f"Error: Input file '{input_svg}' not found!")
+            print(f"Current working directory: {os.getcwd()}")
+            print(f"Tried path: {input_svg}")
             return False
         else:
             find_and_remove_duplicate_paths(input_svg, output_svg)
 
-        sync_websocket_print(f"✅ Step1 completed successfully:")
-        sync_websocket_print(f"   - Input SVG: {input_svg}")
-        sync_websocket_print(f"   - Processed SVG: {output_svg}")
+        print(f"✅ Step1 completed successfully:")
+        print(f"   - Input SVG: {input_svg}")
+        print(f"   - Processed SVG: {output_svg}")
         return True
             
     except Exception as e:
-        sync_websocket_print(f"An error occurred: {str(e)}")
+        print(f"An error occurred: {str(e)}")
         return False
 
 # Usage

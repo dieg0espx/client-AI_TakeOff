@@ -15,7 +15,6 @@ import io
 from PIL import Image
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-from processors.websocket_utils import sync_websocket_print
 
 
 # Shores pattern for detecting specific path elements
@@ -40,23 +39,23 @@ def svg_to_image(svg_path, output_path=None):
             # Save as PNG if output path is provided
             image.save(output_path, 'PNG')
             
-            sync_websocket_print(f"SVG converted and saved as: {output_path}")
+            print(f"SVG converted and saved as: {output_path}")
         
         return image
     except Exception as e:
         
-        sync_websocket_print(f"Error converting SVG to image: {e}", "error")
+        print(f"Error converting SVG to image: {e}", "error")
         return None
 
 def detect_red_squares(image_path, output_path='results.png'):
     """Detect individual red squares with color #fb0505 using contour detection"""
     
-    sync_websocket_print(f"Processing image: {image_path}")
+    print(f"Processing image: {image_path}")
     
     # Check if input is SVG and convert if needed
     if str(image_path).lower().endswith('.svg'):
         
-        sync_websocket_print("Converting SVG to image for processing...")
+        print("Converting SVG to image for processing...")
         pil_image = svg_to_image(str(image_path))
         if pil_image is None:
             return 0
@@ -69,10 +68,10 @@ def detect_red_squares(image_path, output_path='results.png'):
     
     if img is None:
         
-        sync_websocket_print(f"Error: Could not read image {image_path}", "error")
+        print(f"Error: Could not read image {image_path}", "error")
         return 0
     
-    sync_websocket_print(f"Image loaded successfully: {img.shape}")
+    print(f"Image loaded successfully: {img.shape}")
     
     # Convert to HSV for better color detection
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
@@ -85,7 +84,7 @@ def detect_red_squares(image_path, output_path='results.png'):
     target_color_hsv = cv2.cvtColor(target_color_bgr.reshape(1, 1, 3), cv2.COLOR_BGR2HSV)
     target_h, target_s, target_v = target_color_hsv[0, 0]
     
-    sync_websocket_print(f"Target HSV values: H={target_h}, S={target_s}, V={target_v}")
+    print(f"Target HSV values: H={target_h}, S={target_s}, V={target_v}")
     
     # Create a wider range around the target color for better detection
     # Allow more tolerance for slight variations and lighting differences
@@ -106,14 +105,14 @@ def detect_red_squares(image_path, output_path='results.png'):
         min(255, int(target_v) + tolerance_v)
     ], dtype=np.uint8)
     
-    sync_websocket_print(f"HSV range: Lower={lower_red}, Upper={upper_red}")
+    print(f"HSV range: Lower={lower_red}, Upper={upper_red}")
     
     # Create mask for the specific red color
     red_mask = cv2.inRange(hsv, lower_red, upper_red)
     
     # Count non-zero pixels in mask
     mask_pixels = cv2.countNonZero(red_mask)
-    sync_websocket_print(f"HSV mask pixels: {mask_pixels}")
+    print(f"HSV mask pixels: {mask_pixels}")
     
     # If HSV detection fails, try RGB-based detection as fallback
     if mask_pixels < 50:  # Reduced threshold
@@ -130,26 +129,26 @@ def detect_red_squares(image_path, output_path='results.png'):
         lower_rgb = np.maximum(0, target_rgb - tolerance_rgb)
         upper_rgb = np.minimum(255, target_rgb + tolerance_rgb)
         
-        sync_websocket_print(f"RGB range: Lower={lower_rgb}, Upper={upper_rgb}")
+        print(f"RGB range: Lower={lower_rgb}, Upper={upper_rgb}")
         
         # Create mask for red objects in RGB
         red_mask_rgb = cv2.inRange(rgb, lower_rgb, upper_rgb)
         
         rgb_mask_pixels = cv2.countNonZero(red_mask_rgb)
-        sync_websocket_print(f"RGB mask pixels: {rgb_mask_pixels}")
+        print(f"RGB mask pixels: {rgb_mask_pixels}")
         
         # Use the better mask
         if rgb_mask_pixels > mask_pixels:
             red_mask = red_mask_rgb
             mask_pixels = rgb_mask_pixels
-            sync_websocket_print("Using RGB mask")
+            print("Using RGB mask")
         else:
-            sync_websocket_print("Using HSV mask")
+            print("Using HSV mask")
     
     # Save debug mask
     debug_mask_path = output_path.replace('.png', '_mask.png')
     cv2.imwrite(debug_mask_path, red_mask)
-    sync_websocket_print(f"Debug mask saved to: {debug_mask_path}")
+    print(f"Debug mask saved to: {debug_mask_path}")
     
     # Apply morphological operations to clean up the mask
     kernel = np.ones((3,3), np.uint8)
@@ -158,7 +157,7 @@ def detect_red_squares(image_path, output_path='results.png'):
     
     # Find contours
     contours, _ = cv2.findContours(red_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    sync_websocket_print(f"Total contours found: {len(contours)}")
+    print(f"Total contours found: {len(contours)}")
     
     # Filter contours based on area and shape
     valid_contours = []
@@ -177,15 +176,15 @@ def detect_red_squares(image_path, output_path='results.png'):
                 # Additional check: ensure reasonable size
                 if w >= 2 and h >= 2:  # Very reduced minimum size requirement
                     valid_contours.append((contour, x, y, w, h, area))
-                    sync_websocket_print(f"Contour {i}: Area={area:.1f}, Size={w}x{h}, Aspect={aspect_ratio:.2f} - ACCEPTED")
+                    print(f"Contour {i}: Area={area:.1f}, Size={w}x{h}, Aspect={aspect_ratio:.2f} - ACCEPTED")
                 else:
-                    sync_websocket_print(f"Contour {i}: Area={area:.1f}, Size={w}x{h}, Aspect={aspect_ratio:.2f} - REJECTED (size)")
+                    print(f"Contour {i}: Area={area:.1f}, Size={w}x{h}, Aspect={aspect_ratio:.2f} - REJECTED (size)")
             else:
-                sync_websocket_print(f"Contour {i}: Area={area:.1f}, Size={w}x{h}, Aspect={aspect_ratio:.2f} - REJECTED (aspect)")
+                print(f"Contour {i}: Area={area:.1f}, Size={w}x{h}, Aspect={aspect_ratio:.2f} - REJECTED (aspect)")
         else:
-            sync_websocket_print(f"Contour {i}: Area={area:.1f}, Size={w}x{h}, Aspect={aspect_ratio:.2f} - REJECTED (area filter)")
+            print(f"Contour {i}: Area={area:.1f}, Size={w}x{h}, Aspect={aspect_ratio:.2f} - REJECTED (area filter)")
     
-    sync_websocket_print(f"Found {len(valid_contours)} initial contours")
+    print(f"Found {len(valid_contours)} initial contours")
     
     # Group nearby contours to identify individual squares
     if len(valid_contours) > 0:
@@ -242,7 +241,7 @@ def detect_red_squares(image_path, output_path='results.png'):
                         grouped_contours.append(([(contour, x, y, w, h, area)], x, y, w, h))
         
         valid_contours = grouped_contours
-        sync_websocket_print(f"Grouped into {len(valid_contours)} squares")
+        print(f"Grouped into {len(valid_contours)} squares")
     
     # Draw results
     result_img = img.copy()
@@ -261,18 +260,18 @@ def detect_red_squares(image_path, output_path='results.png'):
         cv2.putText(result_img, label, (int(x), int(y)-10), 
                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
         
-        sync_websocket_print(f"Square{i+1}: Size={w:.1f}x{h:.1f}, Contours={len(contours_group)}")
+        print(f"Square{i+1}: Size={w:.1f}x{h:.1f}, Contours={len(contours_group)}")
     
     # Save result
     cv2.imwrite(output_path, result_img)
-    sync_websocket_print(f"Result saved as: {output_path}")
-    sync_websocket_print(f"Total squares detected: {len(valid_contours)}")
+    print(f"Result saved as: {output_path}")
+    print(f"Total squares detected: {len(valid_contours)}")
     
     # Delete the debug mask file after processing
     debug_mask_path = output_path.replace('.png', '_mask.png')
     if os.path.exists(debug_mask_path):
         os.remove(debug_mask_path)
-        sync_websocket_print(f"Debug mask deleted: {debug_mask_path}")
+        print(f"Debug mask deleted: {debug_mask_path}")
     
     return len(valid_contours)
 
@@ -293,7 +292,7 @@ def process_svg_colors():
     
     # PHASE 1: Color processing from Step4.svg to Step6.svg
     
-    sync_websocket_print("PHASE 1: Processing colors from Step4.svg to Step6.svg")
+    print("PHASE 1: Processing colors from Step4.svg to Step6.svg")
     
     # Read the SVG file
     with open(input_svg, 'r', encoding='utf-8') as file:
@@ -319,10 +318,10 @@ def process_svg_colors():
     with open(output_svg, 'w', encoding='utf-8') as file:
         file.write(processed_content)
     
-    sync_websocket_print("Phase 1 completed: Colors processed and saved to Step6.svg")
+    print("Phase 1 completed: Colors processed and saved to Step6.svg")
     
     # PHASE 2: Shores processing on Step6.svg
-    sync_websocket_print("\nPHASE 2: Processing shores on Step6.svg")
+    print("\nPHASE 2: Processing shores on Step6.svg")
     
     # Read the Step6.svg file for shores processing
     with open(output_svg, 'r', encoding='utf-8') as file:
@@ -375,17 +374,17 @@ def process_svg_colors():
     with open(output_svg, 'w', encoding='utf-8') as file:
         file.write(modified_content)
     
-    sync_websocket_print("SVG processing completed!")
-    sync_websocket_print("Phase 1: Original colors replaced with #202124 (except #fb0505)")
-    sync_websocket_print("Phase 1: #0000ff changed to #fb0505")
-    sync_websocket_print("Phase 2: All elements with stroke:#fb0505 now have fill:#fb0505")
-    sync_websocket_print("Phase 2: All shores matching the pattern now have stroke color #202124")
-    sync_websocket_print("Phase 2: All #202124 colors changed to black (squares)")
-    sync_websocket_print("Phase 2: All red (#fb0505) colors changed to red (background)")
-    sync_websocket_print(f"Final output saved to: {output_svg}")
+    print("SVG processing completed!")
+    print("Phase 1: Original colors replaced with #202124 (except #fb0505)")
+    print("Phase 1: #0000ff changed to #fb0505")
+    print("Phase 2: All elements with stroke:#fb0505 now have fill:#fb0505")
+    print("Phase 2: All shores matching the pattern now have stroke color #202124")
+    print("Phase 2: All #202124 colors changed to black (squares)")
+    print("Phase 2: All red (#fb0505) colors changed to red (background)")
+    print(f"Final output saved to: {output_svg}")
     
     # PHASE 3: Fill squares before conversion
-    sync_websocket_print("\nPHASE 3: Filling squares in Step6.svg")
+    print("\nPHASE 3: Filling squares in Step6.svg")
     
     # Read the Step6.svg file for square filling
     with open(output_svg, 'r', encoding='utf-8') as file:
@@ -408,20 +407,20 @@ def process_svg_colors():
     with open(output_svg, 'w', encoding='utf-8') as file:
         file.write(filled_content)
     
-    sync_websocket_print("Phase 3 completed: Squares filled with red color")
-    sync_websocket_print(f"Filled SVG saved to: {output_svg}")
+    print("Phase 3 completed: Squares filled with red color")
+    print(f"Filled SVG saved to: {output_svg}")
     
     # PHASE 4: Contour-based object detection
-    sync_websocket_print("\nPHASE 4: Contour-based object detection on Step6.svg")
+    print("\nPHASE 4: Contour-based object detection on Step6.svg")
     
     try:
         # Detect red squares in the processed SVG
         count = detect_red_squares(output_svg, output_results)
-        sync_websocket_print(f"Phase 3 completed: Detected {count} red squares")
-        sync_websocket_print(f"Results saved to: {output_results}")
+        print(f"Phase 3 completed: Detected {count} red squares")
+        print(f"Results saved to: {output_results}")
     except Exception as e:
-        sync_websocket_print(f"Phase 3 error: {e}", "error")
-        sync_websocket_print("Note: Make sure cairosvg is installed: pip install cairosvg", "warning")
+        print(f"Phase 3 error: {e}", "error")
+        print("Note: Make sure cairosvg is installed: pip install cairosvg", "warning")
 
 def run_step6():
     """
@@ -449,7 +448,7 @@ def run_step6():
         
     except Exception as e:
         
-        sync_websocket_print(f"Error in processing: {e}", "error")
+        print(f"Error in processing: {e}", "error")
         return False
 
 def main():
@@ -468,11 +467,11 @@ def main():
         source_path = Path(args.source)
         if not source_path.exists():
             
-            sync_websocket_print(f"Error: Source not found at {source_path}", "error")
+            print(f"Error: Source not found at {source_path}", "error")
             return
         
         count = detect_red_squares(source_path, args.output)
-        sync_websocket_print(f"\nFinal count: {count} red squares (#fb0505)")
+        print(f"\nFinal count: {count} red squares (#fb0505)")
     else:
         # Run full SVG processing pipeline
         process_svg_colors()

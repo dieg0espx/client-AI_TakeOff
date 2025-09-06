@@ -14,7 +14,6 @@ import shutil
 import sys
 from datetime import datetime
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-from processors.websocket_utils import sync_websocket_print
 import cairosvg
 import io
 from PIL import Image
@@ -34,23 +33,23 @@ def svg_to_image(svg_path, output_path=None):
             # Save as PNG if output path is provided
             image.save(output_path, 'PNG')
             
-            sync_websocket_print(f"SVG converted and saved as: {output_path}")
+            print(f"SVG converted and saved as: {output_path}")
         
         return image
     except Exception as e:
         
-        sync_websocket_print(f"Error converting SVG to image: {e}", "error")
+        print(f"Error converting SVG to image: {e}", "error")
         return None
 
 def detect_blue_x_shapes(image_path, output_path='results.png'):
     """Detect individual blue X shapes using contour detection"""
     
-    sync_websocket_print(f"Processing image: {image_path}")
+    print(f"Processing image: {image_path}")
     
     # Check if input is SVG and convert if needed
     if str(image_path).lower().endswith('.svg'):
         
-        sync_websocket_print("Converting SVG to image for processing...")
+        print("Converting SVG to image for processing...")
         pil_image = svg_to_image(image_path)
         if pil_image is None:
             return 0
@@ -63,7 +62,7 @@ def detect_blue_x_shapes(image_path, output_path='results.png'):
     
     if img is None:
         
-        sync_websocket_print(f"Error: Could not read image {image_path}", "error")
+        print(f"Error: Could not read image {image_path}", "error")
         return 0
     
     # Convert to HSV for better color detection
@@ -103,7 +102,7 @@ def detect_blue_x_shapes(image_path, output_path='results.png'):
                 if w >= 5 and h >= 5:  # Minimum size requirement
                     valid_contours.append((contour, x, y, w, h, area))
     
-    sync_websocket_print(f"Found {len(valid_contours)} initial contours")
+    print(f"Found {len(valid_contours)} initial contours")
     
     # Group nearby contours to identify individual X shapes
     if len(valid_contours) > 0:
@@ -160,7 +159,7 @@ def detect_blue_x_shapes(image_path, output_path='results.png'):
                         grouped_contours.append(([(contour, x, y, w, h, area)], x, y, w, h))
         
         valid_contours = grouped_contours
-        sync_websocket_print(f"Grouped into {len(valid_contours)} X shapes")
+        print(f"Grouped into {len(valid_contours)} X shapes")
     
     # Draw results
     result_img = img.copy()
@@ -179,7 +178,7 @@ def detect_blue_x_shapes(image_path, output_path='results.png'):
         cv2.putText(result_img, label, (int(x), int(y)-10), 
                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
         
-        sync_websocket_print(f"X{i+1}: Size={w:.1f}x{h:.1f}, Contours={len(contours_group)}")
+        print(f"X{i+1}: Size={w:.1f}x{h:.1f}, Contours={len(contours_group)}")
     
     # Save result
     if output_path.lower().endswith('.svg'):
@@ -188,12 +187,12 @@ def detect_blue_x_shapes(image_path, output_path='results.png'):
         # For now, save as PNG with SVG extension (you might want to convert back to SVG)
         png_path = output_path.replace('.svg', '.png')
         cv2.imwrite(png_path, result_img)
-        sync_websocket_print(f"Result saved as: {png_path} (PNG format)")
+        print(f"Result saved as: {png_path} (PNG format)")
     else:
         cv2.imwrite(output_path, result_img)
-        sync_websocket_print(f"Result saved as: {output_path}")
+        print(f"Result saved as: {output_path}")
     
-    sync_websocket_print(f"Total X shapes detected: {len(valid_contours)}")
+    print(f"Total X shapes detected: {len(valid_contours)}")
     
     return len(valid_contours)
 
@@ -226,16 +225,16 @@ def process_svg_colors(input_svg, output_svg):
             file.write(processed_content)
         
         
-        sync_websocket_print("SVG processing completed!")
-        sync_websocket_print("Original colors replaced with #202124 (except #0000ff)")
-        sync_websocket_print(f"Output saved to: {output_svg}")
+        print("SVG processing completed!")
+        print("Original colors replaced with #202124 (except #0000ff)")
+        print(f"Output saved to: {output_svg}")
         
     except FileNotFoundError:
         
-        sync_websocket_print(f"Error: Could not find input file {input_svg}", "error")
+        print(f"Error: Could not find input file {input_svg}", "error")
     except Exception as e:
         
-        sync_websocket_print(f"Error processing SVG: {e}", "error")
+        print(f"Error processing SVG: {e}", "error")
 
 def run_step5():
     """
@@ -261,15 +260,15 @@ def run_step5():
         
         # Then detect blue X shapes on the processed SVG
         
-        sync_websocket_print(f"Detecting blue X shapes in: {output_svg}")
+        print(f"Detecting blue X shapes in: {output_svg}")
         count = detect_blue_x_shapes(output_svg, output_results)
-        sync_websocket_print(f"\nFinal count: {count} blue X shapes")
+        print(f"\nFinal count: {count} blue X shapes")
         
         return True
         
     except Exception as e:
         
-        sync_websocket_print(f"Error in processing: {e}", "error")
+        print(f"Error in processing: {e}", "error")
         return False
 
 def main():
@@ -285,13 +284,13 @@ def main():
     source_path = Path(args.source)
     if not source_path.exists():
         
-        sync_websocket_print(f"Error: Source not found at {source_path}", "error")
+        print(f"Error: Source not found at {source_path}", "error")
         return
     
     # Detect X shapes
     count = detect_blue_x_shapes(source_path, args.output)
     
-    sync_websocket_print(f"\nFinal count: {count} blue X shapes")
+    print(f"\nFinal count: {count} blue X shapes")
 
 if __name__ == "__main__":
     try:
@@ -314,10 +313,10 @@ if __name__ == "__main__":
         
         # Then detect blue X shapes on the processed SVG
         
-        sync_websocket_print(f"Detecting blue X shapes in: {output_svg}")
+        print(f"Detecting blue X shapes in: {output_svg}")
         count = detect_blue_x_shapes(output_svg, output_results)
-        sync_websocket_print(f"\nFinal count: {count} blue X shapes")
+        print(f"\nFinal count: {count} blue X shapes")
         
     except Exception as e:
         
-        sync_websocket_print(f"Error in processing: {e}", "error")
+        print(f"Error in processing: {e}", "error")

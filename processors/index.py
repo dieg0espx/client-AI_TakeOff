@@ -4,7 +4,6 @@ import importlib.util
 import json
 from pathlib import Path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-from processors.websocket_utils import sync_websocket_print
 
 def run_step(step_name, capture_output=False):
     """
@@ -15,12 +14,12 @@ def run_step(step_name, capture_output=False):
         step_file = f"processors/{step_name}.py"
         
         if not os.path.exists(step_file):
-            sync_websocket_print(f"Step file {step_file} not found. Skipping...")
+            print(f"Step file {step_file} not found. Skipping...")
             return False, None
         
-        sync_websocket_print(f"\n{'='*50}")
-        sync_websocket_print(f"Running {step_name}...")
-        sync_websocket_print(f"{'='*50}")
+        print(f"\n{'='*50}")
+        print(f"Running {step_name}...")
+        print(f"{'='*50}")
         
         # Add processors directory to Python path so step modules can import from each other
         processors_dir = os.path.abspath("processors")
@@ -73,10 +72,10 @@ def run_step(step_name, capture_output=False):
                     count = extract_count_from_output(step_name, output)
                     
                     if success:
-                        sync_websocket_print(f"✅ {step_name} completed successfully")
+                        print(f"✅ {step_name} completed successfully")
                         return True, count
                     else:
-                        sync_websocket_print(f"❌ {step_name} failed")
+                        print(f"❌ {step_name} failed")
                         return False, None
                 finally:
                     # Restore original stdout
@@ -84,17 +83,17 @@ def run_step(step_name, capture_output=False):
             else:
                 success = run_function()
                 if success:
-                    sync_websocket_print(f"✅ {step_name} completed successfully")
+                    print(f"✅ {step_name} completed successfully")
                     return True, None
                 else:
-                    sync_websocket_print(f"❌ {step_name} failed")
+                    print(f"❌ {step_name} failed")
                     return False, None
         else:
-            sync_websocket_print(f"⚠️  No run function found for {step_name}")
+            print(f"⚠️  No run function found for {step_name}")
             return False, None
         
     except Exception as e:
-        sync_websocket_print(f"❌ Error running {step_name}: {str(e)}")
+        print(f"❌ Error running {step_name}: {str(e)}")
         return False, None
 
 def extract_count_from_output(step_name, output):
@@ -156,29 +155,29 @@ def update_data_json(step_counts):
             cloudinary_manager = get_cloudinary_manager()
             
             if cloudinary_manager:
-                sync_websocket_print("☁️  Uploading processing results to Cloudinary...")
+                print("☁️  Uploading processing results to Cloudinary...")
                 cloudinary_urls = cloudinary_manager.upload_processing_results(step_counts)
                 
                 if cloudinary_urls:
                     data["cloudinary_urls"] = cloudinary_urls
-                    sync_websocket_print(f"✅ Successfully uploaded {len(cloudinary_urls)} images to Cloudinary")
+                    print(f"✅ Successfully uploaded {len(cloudinary_urls)} images to Cloudinary")
                 else:
-                    sync_websocket_print("⚠️  No images were uploaded to Cloudinary")
+                    print("⚠️  No images were uploaded to Cloudinary")
             else:
-                sync_websocket_print("⚠️  Cloudinary not configured - skipping image uploads")
+                print("⚠️  Cloudinary not configured - skipping image uploads")
                 
         except Exception as e:
-            sync_websocket_print(f"⚠️  Error uploading to Cloudinary: {str(e)}")
+            print(f"⚠️  Error uploading to Cloudinary: {str(e)}")
         
         # Write back to data.json
         with open(data_file, 'w') as f:
             json.dump(data, f, indent=4)
         
-        sync_websocket_print(f"✅ Updated {data_file} with step results and Cloudinary URLs")
+        print(f"✅ Updated {data_file} with step results and Cloudinary URLs")
         return True
         
     except Exception as e:
-        sync_websocket_print(f"❌ Error updating data.json: {str(e)}")
+        print(f"❌ Error updating data.json: {str(e)}")
         return False
 
 def check_prerequisites():
@@ -196,24 +195,24 @@ def check_prerequisites():
             missing_files.append(file_path)
     
     if missing_files:
-        sync_websocket_print("❌ Missing required files:")
+        print("❌ Missing required files:")
         for file_path in missing_files:
-            sync_websocket_print(f"   - {file_path}")
+            print(f"   - {file_path}")
         return False
     
-    sync_websocket_print("✅ All required files found")
+    print("✅ All required files found")
     return True
 
 def main():
     """
     Main orchestrator function that runs all processing steps
     """
-    sync_websocket_print("🚀 Starting AI TakeOff Processing Pipeline")
-    sync_websocket_print("=" * 60)
+    print("🚀 Starting AI TakeOff Processing Pipeline")
+    print("=" * 60)
     
     # Check prerequisites
     if not check_prerequisites():
-        sync_websocket_print("❌ Prerequisites not met. Exiting.")
+        print("❌ Prerequisites not met. Exiting.")
         return False
     
     # Define the processing steps in order
@@ -251,45 +250,45 @@ def main():
                 step_number = step.lower().replace("step", "step")
                 step_counts[f"{step_number}_{step_descriptions[step]}"] = count
         else:
-            sync_websocket_print(f"⚠️  Pipeline stopped due to failure in {step}")
+            print(f"⚠️  Pipeline stopped due to failure in {step}")
             break
     
     # Summary
-    sync_websocket_print(f"\n{'='*60}")
-    sync_websocket_print("📊 Processing Summary")
-    sync_websocket_print(f"{'='*60}")
-    sync_websocket_print(f"Steps completed: {successful_steps}/{total_steps}")
+    print(f"\n{'='*60}")
+    print("📊 Processing Summary")
+    print(f"{'='*60}")
+    print(f"Steps completed: {successful_steps}/{total_steps}")
     
     if successful_steps == total_steps:
-        sync_websocket_print("🎉 All steps completed successfully!")
+        print("🎉 All steps completed successfully!")
         
         # Update data.json with the collected counts
         if step_counts:
             if update_data_json(step_counts):
-                sync_websocket_print("✅ Step counts successfully stored in data.json")
+                print("✅ Step counts successfully stored in data.json")
             else:
-                sync_websocket_print("⚠️  Failed to store step counts in data.json")
+                print("⚠️  Failed to store step counts in data.json")
         
         # Check if data.json was created/updated
         if os.path.exists("data.json"):
             try:
                 with open("data.json", 'r') as f:
                     data = json.load(f)
-                sync_websocket_print("📄 data.json updated with processing results")
+                print("📄 data.json updated with processing results")
                 if 'original_drawing' in data:
-                    sync_websocket_print(f"   - Original drawing URL: {data['original_drawing']}")
+                    print(f"   - Original drawing URL: {data['original_drawing']}")
                 if 'step_results' in data:
-                    sync_websocket_print("   - Step results:")
+                    print("   - Step results:")
                     for step, count in data['step_results'].items():
-                        sync_websocket_print(f"     * {step}: {count}")
+                        print(f"     * {step}: {count}")
                 if 'cloudinary_urls' in data:
-                    sync_websocket_print("   - Cloudinary URLs:")
+                    print("   - Cloudinary URLs:")
                     for step, url in data['cloudinary_urls'].items():
-                        sync_websocket_print(f"     * {step}: {url}")
+                        print(f"     * {step}: {url}")
             except Exception as e:
-                sync_websocket_print(f"⚠️  Could not read data.json: {e}")
+                print(f"⚠️  Could not read data.json: {e}")
     else:
-        sync_websocket_print("⚠️  Pipeline completed with some failures")
+        print("⚠️  Pipeline completed with some failures")
         # Don't exit the server, just return False to indicate failure
         return False
     

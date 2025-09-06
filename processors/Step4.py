@@ -3,7 +3,6 @@ import os
 import json
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-from processors.websocket_utils import sync_websocket_print
 
 from colorama import init, Fore, Style
 from PatternComponents import shores_box, frames_6x4, frames_5x4, frames_inBox, shores
@@ -27,13 +26,13 @@ def print_table(box_count, shores_count, frames6x4_count, frames5x4_count, frame
     # Table dimensions
     width = 45
     
-    sync_websocket_sync_websocket_print(f"\n{Fore.CYAN}{'='*width}")
-    sync_websocket_sync_websocket_print(f"{' DETECTED ELEMENTS ':=^{width}}")
-    sync_websocket_sync_websocket_print(f"{'='*width}{Style.RESET_ALL}")
+    print(f"\n{Fore.CYAN}{'='*width}")
+    print(f"{' DETECTED ELEMENTS ':=^{width}}")
+    print(f"{'='*width}{Style.RESET_ALL}")
     
     # Column headers
-    sync_websocket_sync_websocket_print(f"{'Category':<30} {'':^8} {'Count':>6}")
-    sync_websocket_sync_websocket_print(f"{'-'*width}")
+    print(f"{'Category':<30} {'':^8} {'Count':>6}")
+    print(f"{'-'*width}")
     
     # Table rows with colored bullets
     elements = [
@@ -46,15 +45,15 @@ def print_table(box_count, shores_count, frames6x4_count, frames5x4_count, frame
     
     for category, count in elements:
         color = colors[category]
-        sync_websocket_sync_websocket_print(
+        print(
             f"{category:<30} "
             f"{color}●{Style.RESET_ALL} "
             f"{count:>6}"
         )
     
-    sync_websocket_sync_websocket_print(f"{'-'*width}")
+    print(f"{'-'*width}")
     total = sum([box_count, shores_count, frames6x4_count, frames5x4_count, framesinbox_count])
-    sync_websocket_sync_websocket_print(f"{'Total elements':<30} {'':^8} {total:>6}\n")
+    print(f"{'Total elements':<30} {'':^8} {total:>6}\n")
 
 def append_counts_to_json(box_count, shores_count, frames6x4_count, frames5x4_count, framesinbox_count):
     # This function is no longer needed as we don't store objects in data.json
@@ -73,7 +72,7 @@ def apply_color_to_specific_paths(input_file, output_file, red="#fb0505", blue="
     try:
         if not os.path.exists(input_file):
             
-            sync_websocket_sync_websocket_print(f"{input_file} not found.", "error")
+            print(f"{input_file} not found.", "error")
             return
 
         with open(input_file, "r", encoding="utf-8") as file:
@@ -223,10 +222,10 @@ def apply_color_to_specific_paths(input_file, output_file, red="#fb0505", blue="
                     if path_id_num is not None:
                         diagonal_path_ids.add(path_id_num)
                         
-                        sync_websocket_sync_websocket_print(f"[DIAG] Found diagonal path: {path_id} (ID number: {path_id_num})")
+                        print(f"[DIAG] Found diagonal path: {path_id} (ID number: {path_id_num})")
             
             
-            sync_websocket_sync_websocket_print(f"Found {len(diagonal_path_ids)} diagonal paths with numeric IDs")
+            print(f"Found {len(diagonal_path_ids)} diagonal paths with numeric IDs")
             
             # Step 2: Find all paths that contain lengths 294-300 or "V 9114" in their d parameter
             pattern = re.compile(r'<path[^>]+d="[^"]*(?:\b(29[4-9]|300)\b|V\s+9114)[^"]*"[^>]*>', re.IGNORECASE)
@@ -269,18 +268,18 @@ def apply_color_to_specific_paths(input_file, output_file, red="#fb0505", blue="
                     d_str = d_match.group(1) if d_match else "unknown"
                     
                     
-                    sync_websocket_sync_websocket_print(f"[FOUND] Path {path_id} (ID: {path_id_num}) contains length {length} in d='{d_str}'")
-                    sync_websocket_sync_websocket_print(f"[ADJACENT] Distance {min_distance} from diagonal path ID {closest_diagonal}")
+                    print(f"[FOUND] Path {path_id} (ID: {path_id_num}) contains length {length} in d='{d_str}'")
+                    print(f"[ADJACENT] Distance {min_distance} from diagonal path ID {closest_diagonal}")
                     
                     # Color this path pink
                     pink_tag = color_path_pink(path_tag)
                     modifications.append((path_tag, pink_tag))
                     adjacent_count += 1
                     
-                    sync_websocket_sync_websocket_print(f"[NEIGH] id={path_id} → PINK (adjacent to diagonal ID {closest_diagonal}, distance: {min_distance})")
+                    print(f"[NEIGH] id={path_id} → PINK (adjacent to diagonal ID {closest_diagonal}, distance: {min_distance})")
             
-            sync_websocket_sync_websocket_print(f"Total adjacent paths with lengths 294-300: {adjacent_count}")
-            sync_websocket_sync_websocket_print(f"Total modifications to apply: {len(modifications)}")
+            print(f"Total adjacent paths with lengths 294-300: {adjacent_count}")
+            print(f"Total modifications to apply: {len(modifications)}")
             
             # Apply all modifications
             modified_text = svg_text
@@ -304,11 +303,11 @@ def apply_color_to_specific_paths(input_file, output_file, red="#fb0505", blue="
             file.write(modified_svg_text)
 
         
-        sync_websocket_sync_websocket_print("SVG file updated successfully.")
+        print("SVG file updated successfully.")
 
     except Exception as e:
         
-        sync_websocket_sync_websocket_print(f"Error applying colors: {e}", "error")
+        print(f"Error applying colors: {e}", "error")
 
 def svg_to_png(svg_path, png_path):
     """Convert SVG to PNG format"""
@@ -322,12 +321,12 @@ def svg_to_png(svg_path, png_path):
         # Save as PNG
         image.save(png_path, 'PNG')
         
-        sync_websocket_sync_websocket_print(f"✅ SVG converted to PNG: {png_path}")
+        print(f"✅ SVG converted to PNG: {png_path}")
         return True
         
     except Exception as e:
         
-        sync_websocket_sync_websocket_print(f"❌ Error converting SVG to PNG: {e}", "error")
+        print(f"❌ Error converting SVG to PNG: {e}", "error")
         return False
 
 def run_step4():
@@ -350,9 +349,9 @@ def run_step4():
         # Check if input file exists
         if not os.path.exists(input_svg):
             
-            sync_websocket_sync_websocket_print(f"Error: Input file '{input_svg}' not found!", "error")
-            sync_websocket_sync_websocket_print(f"Current working directory: {os.getcwd()}", "error")
-            sync_websocket_sync_websocket_print(f"Tried path: {input_svg}", "error")
+            print(f"Error: Input file '{input_svg}' not found!", "error")
+            print(f"Current working directory: {os.getcwd()}", "error")
+            print(f"Tried path: {input_svg}", "error")
             return False
         
         apply_color_to_specific_paths(input_svg, output_svg)
@@ -361,20 +360,20 @@ def run_step4():
         output_png = output_svg.replace('.svg', '-results.png')
         if svg_to_png(output_svg, output_png):
             
-            sync_websocket_sync_websocket_print(f"   - Generated PNG: {output_png}")
+            print(f"   - Generated PNG: {output_png}")
         else:
-            sync_websocket_sync_websocket_print(f"   - Warning: PNG conversion failed", "warning")
+            print(f"   - Warning: PNG conversion failed", "warning")
         
         
-        sync_websocket_sync_websocket_print(f"✅ Step4 completed successfully:")
-        sync_websocket_sync_websocket_print(f"   - Input SVG: {input_svg}")
-        sync_websocket_sync_websocket_print(f"   - Processed SVG: {output_svg}")
-        sync_websocket_sync_websocket_print(f"   - Generated PNG: {output_png}")
+        print(f"✅ Step4 completed successfully:")
+        print(f"   - Input SVG: {input_svg}")
+        print(f"   - Processed SVG: {output_svg}")
+        print(f"   - Generated PNG: {output_png}")
         return True
             
     except Exception as e:
         
-        sync_websocket_sync_websocket_print(f"An error occurred: {str(e)}", "error")
+        print(f"An error occurred: {str(e)}", "error")
         return False
 
 # Main execution
