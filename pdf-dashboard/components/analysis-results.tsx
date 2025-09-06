@@ -1,13 +1,16 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
-import { Copy, Check, Download, Share, FileText, Image, BarChart3, Sparkles, Loader2 } from "lucide-react"
+import { Copy, Check, Download, Share, FileText, Image as ImageIcon, BarChart3, Eye, ZoomIn, ExternalLink, Hash, Square, Circle, RectangleHorizontal, RefreshCw, Wand2 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
+import { useApiClient } from "@/lib/api-client"
 
 interface AnalysisResultsProps {
   fileName: string
@@ -15,21 +18,65 @@ interface AnalysisResultsProps {
   onReset: () => void
 }
 
+interface StepResult {
+  step5_blue_X_shapes: number
+  step6_red_squares: number
+  step7_pink_shapes: number
+  step8_green_rectangles: number
+}
+
+interface CloudinaryUrls {
+  step4_results: string
+  step5_results: string
+  step6_results: string
+  step7_results: string
+  step8_results: string
+}
+
+interface AnalysisData {
+  id: string
+  status: string
+  pdf_path: string
+  pdf_size: number
+  svg_path: string
+  svg_size: number
+  message: string
+  results: {
+    step_results: StepResult
+    cloudinary_urls: CloudinaryUrls
+    extracted_text: string
+  }
+}
+
 export function AnalysisResults({ fileName, result, onReset }: AnalysisResultsProps) {
   const [copied, setCopied] = useState(false)
-  const [rewritingText, setRewritingText] = useState(false)
+  const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const [rewrittenText, setRewrittenText] = useState<string | null>(null)
-  const [formattedText, setFormattedText] = useState<string | null>(null)
+  const [isRewriting, setIsRewriting] = useState(false)
+  const [showRewritten, setShowRewritten] = useState(false)
   const { toast } = useToast()
+  const apiClient = useApiClient()
+
+  // Parse the result data
+  const analysisData: AnalysisData = typeof result === 'string' ? JSON.parse(result) : result
+  const extractedText = analysisData.results.extracted_text
+
+  // Automatically enhance text when component loads
+  useEffect(() => {
+    if (extractedText && !rewrittenText && !isRewriting) {
+      handleRewriteText()
+    }
+  }, [extractedText])
 
   const handleCopy = async () => {
     try {
-      const resultText = typeof result === 'string' ? result : JSON.stringify(result, null, 2)
-      await navigator.clipboard.writeText(resultText)
+      // If we're in the text tab and have rewritten text, copy the current text being displayed
+      const textToCopy = showRewritten && rewrittenText ? rewrittenText : extractedText
+      await navigator.clipboard.writeText(textToCopy)
       setCopied(true)
       toast({
         title: "Copied to clipboard",
-        description: "Analysis results have been copied to your clipboard.",
+        description: "Text has been copied to your clipboard.",
       })
       setTimeout(() => setCopied(false), 2000)
     } catch (err) {
@@ -76,27 +123,14 @@ export function AnalysisResults({ fileName, result, onReset }: AnalysisResultsPr
   }
 
   const handleRewriteText = async () => {
-    if (!result.extracted_text) {
-      toast({
-        title: "No text to rewrite",
-        description: "No extracted text found in the analysis results.",
-        variant: "destructive",
-      })
-      return
-    }
-
-    setRewritingText(true)
+    if (isRewriting) return
+    
+    setIsRewriting(true)
     try {
-      const response = await fetch('/api/rewrite-text', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          text: result.extracted_text,
-          fileName: fileName
-        }),
-      })
+      const response = await apiClient.post('/api/rewrite-text', {
+        text: extractedText,
+        fileName: fileName
+      }, { requireAuth: false })
 
       if (!response.ok) {
         const errorData = await response.json()
@@ -105,6 +139,7 @@ export function AnalysisResults({ fileName, result, onReset }: AnalysisResultsPr
 
       const data = await response.json()
       setRewrittenText(data.rewrittenText)
+      setShowRewritten(true) // Show enhanced text by default
       
       toast({
         title: "Text rewritten successfully",
@@ -114,300 +149,115 @@ export function AnalysisResults({ fileName, result, onReset }: AnalysisResultsPr
       console.error('Error rewriting text:', error)
       toast({
         title: "Failed to rewrite text",
-        description: error instanceof Error ? error.message : "An error occurred while processing the text.",
+        description: error instanceof Error ? error.message : "An error occurred while rewriting the text.",
         variant: "destructive",
       })
     } finally {
-      setRewritingText(false)
+      setIsRewriting(false)
     }
   }
 
-  const handleFormatText = () => {
-    const textToFormat = rewrittenText || result.extracted_text
-    if (!textToFormat) {
-      toast({
-        title: "No text to format",
-        description: "No text available for formatting.",
-        variant: "destructive",
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes'
+    const k = 1024
+    const sizes = ['Bytes', 'KB', 'MB', 'GB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+  }
+
+  const renderMarkdown = (text: string) => {
+    // Simple markdown renderer for basic formatting
+    return text
+      .split('\n')
+      .map((line, index) => {
+        // Handle bold text **text**
+        const boldRegex = /\*\*(.*?)\*\*/g
+        const parts = line.split(boldRegex)
+        
+        return (
+          <div key={index} className="mb-2">
+            {parts.map((part, partIndex) => {
+              if (partIndex % 2 === 1) {
+                // This is bold text
+                return <strong key={partIndex} className="font-semibold">{part}</strong>
+              }
+              return part
+            })}
+          </div>
+        )
       })
-      return
+  }
+
+  const stepResults = analysisData.results.step_results
+  const cloudinaryUrls = analysisData.results.cloudinary_urls
+
+  const stepConfigs = [
+    {
+      key: 'step5_blue_X_shapes',
+      title: 'Blue X Shapes',
+      count: stepResults.step5_blue_X_shapes,
+      icon: Hash,
+      color: 'bg-blue-500',
+      description: 'Detected X-shaped elements in blue'
+    },
+    {
+      key: 'step6_red_squares',
+      title: 'Red Squares',
+      count: stepResults.step6_red_squares,
+      icon: Square,
+      color: 'bg-red-500',
+      description: 'Detected square elements in red'
+    },
+    {
+      key: 'step7_pink_shapes',
+      title: 'Pink Shapes',
+      count: stepResults.step7_pink_shapes,
+      icon: Circle,
+      color: 'bg-pink-500',
+      description: 'Detected circular/pink elements'
+    },
+    {
+      key: 'step8_green_rectangles',
+      title: 'Green Rectangles',
+      count: stepResults.step8_green_rectangles,
+      icon: RectangleHorizontal,
+      color: 'bg-green-500',
+      description: 'Detected rectangular elements in green'
     }
+  ]
 
-    // Basic text formatting
-    let formatted = textToFormat
-      .replace(/\n\n+/g, '\n\n') // Remove excessive line breaks
-      .replace(/([.!?])\s*([A-Z])/g, '$1\n\n$2') // Add line breaks after sentences
-      .replace(/\s+/g, ' ') // Normalize whitespace
-      .trim()
-
-    // Add paragraph breaks for better readability
-    formatted = formatted
-      .split('\n\n')
-      .map((paragraph: string) => paragraph.trim())
-      .filter((paragraph: string) => paragraph.length > 0)
-      .join('\n\n')
-
-    setFormattedText(formatted)
-    
-    toast({
-      title: "Text formatted",
-      description: "The text has been formatted for better readability.",
-    })
-  }
-
-  // Check if result has the expected structure
-  const hasStructuredData = result && typeof result === 'object' && 
-    (result.results?.cloudinary_urls || result.results?.step_results || result.cloudinary_urls || result.step_results)
-
-  const renderStructuredData = () => {
-    if (!hasStructuredData) return null
-
-    // Handle both nested results structure and direct structure
-    const cloudinaryUrls = result.results?.cloudinary_urls || result.cloudinary_urls
-    const stepResults = result.results?.step_results || result.step_results
-
-    return (
-      <div className="space-y-6">
-        {/* Processing Summary */}
-        {result.message && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5 text-primary" />
-                Processing Summary
-              </CardTitle>
-              <CardDescription>{result.message}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {result.status && (
-                  <div className="text-center p-3 bg-muted/30 rounded-lg">
-                    <div className="text-sm font-medium text-muted-foreground">Status</div>
-                    <div className="text-lg font-semibold text-primary capitalize">{result.status}</div>
-                  </div>
-                )}
-                {result.pdf_size && (
-                  <div className="text-center p-3 bg-muted/30 rounded-lg">
-                    <div className="text-sm font-medium text-muted-foreground">PDF Size</div>
-                    <div className="text-lg font-semibold text-primary">
-                      {(result.pdf_size / 1024).toFixed(1)} KB
-                    </div>
-                  </div>
-                )}
-                {result.svg_size && (
-                  <div className="text-center p-3 bg-muted/30 rounded-lg">
-                    <div className="text-sm font-medium text-muted-foreground">SVG Size</div>
-                    <div className="text-lg font-semibold text-primary">
-                      {(result.svg_size / 1024).toFixed(1)} KB
-                    </div>
-                  </div>
-                )}
-                {result.id && (
-                  <div className="text-center p-3 bg-muted/30 rounded-lg">
-                    <div className="text-sm font-medium text-muted-foreground">Task ID</div>
-                    <div className="text-xs font-mono text-primary truncate" title={result.id}>
-                      {result.id.slice(0, 8)}...
-                    </div>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Extracted Text Section */}
-        {result.extracted_text && (
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <FileText className="h-5 w-5 text-primary" />
-                    Extracted Text
-                  </CardTitle>
-                  <CardDescription>Raw text extracted from the PDF document</CardDescription>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={handleFormatText}
-                    className="gap-2"
-                  >
-                    <FileText className="h-4 w-4" />
-                    Format Text
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={handleRewriteText}
-                    disabled={rewritingText}
-                    className="gap-2"
-                  >
-                    {rewritingText ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Sparkles className="h-4 w-4" />
-                    )}
-                    {rewritingText ? "Rewriting..." : "Enhance with AI"}
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="bg-muted/30 rounded-lg p-4 max-h-64 overflow-y-auto border">
-                <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap">
-                  {result.extracted_text}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Rewritten Text Section */}
-        {rewrittenText && (
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <Sparkles className="h-5 w-5 text-primary" />
-                    Enhanced Analysis
-                  </CardTitle>
-                  <CardDescription>AI-enhanced and professional version of the extracted text</CardDescription>
-                </div>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={handleFormatText}
-                  className="gap-2"
-                >
-                  <FileText className="h-4 w-4" />
-                  Format Text
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="bg-muted/30 rounded-lg p-6 max-h-96 overflow-y-auto border">
-                <div className="prose prose-sm max-w-none text-foreground">
-                  <div 
-                    className="text-sm leading-relaxed whitespace-pre-wrap"
-                    style={{ 
-                      fontFamily: 'inherit',
-                      lineHeight: '1.6'
-                    }}
-                  >
-                    {rewrittenText}
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Formatted Text Section */}
-        {formattedText && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5 text-primary" />
-                Formatted Text
-              </CardTitle>
-              <CardDescription>Clean, readable version with proper formatting and paragraph breaks</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="bg-muted/30 rounded-lg p-6 max-h-96 overflow-y-auto border">
-                <div className="prose prose-sm max-w-none text-foreground">
-                  <div 
-                    className="text-sm leading-relaxed whitespace-pre-wrap"
-                    style={{ 
-                      fontFamily: 'inherit',
-                      lineHeight: '1.8',
-                      textAlign: 'justify'
-                    }}
-                  >
-                    {formattedText}
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Cloudinary URLs Section */}
-        {cloudinaryUrls && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Image className="h-5 w-5 text-primary" />
-                Generated Images
-              </CardTitle>
-              <CardDescription>AI-generated visual analysis results</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {Object.entries(cloudinaryUrls).map(([key, url]) => (
-                  <div key={key} className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Badge variant="outline" className="text-xs">
-                        {key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                      </Badge>
-                    </div>
-                    <div className="aspect-square bg-muted rounded-lg overflow-hidden">
-                      <img 
-                        src={url as string} 
-                        alt={key}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement
-                          target.style.display = 'none'
-                        }}
-                      />
-                    </div>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="w-full"
-                      onClick={() => window.open(url as string, '_blank')}
-                    >
-                      View Full Size
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Step Results Section */}
-        {stepResults && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="h-5 w-5 text-primary" />
-                Analysis Statistics
-              </CardTitle>
-              <CardDescription>Shape detection and counting results</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {Object.entries(stepResults).map(([key, value]) => (
-                  <div key={key} className="text-center p-4 bg-muted/30 rounded-lg">
-                    <div className="text-2xl font-bold text-primary">
-                      {value as number}
-                    </div>
-                    <div className="text-sm text-muted-foreground mt-1">
-                      {key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-      </div>
-    )
-  }
+  const imageSteps = [
+    {
+      key: 'step4_results',
+      title: 'Step 4 Results',
+      url: cloudinaryUrls.step4_results,
+      description: 'Initial processing results'
+    },
+    {
+      key: 'step5_results',
+      title: 'Step 5 Results',
+      url: cloudinaryUrls.step5_results,
+      description: 'Blue X shapes detection'
+    },
+    {
+      key: 'step6_results',
+      title: 'Step 6 Results',
+      url: cloudinaryUrls.step6_results,
+      description: 'Red squares detection'
+    },
+    {
+      key: 'step7_results',
+      title: 'Step 7 Results',
+      url: cloudinaryUrls.step7_results,
+      description: 'Pink shapes detection'
+    },
+    {
+      key: 'step8_results',
+      title: 'Step 8 Results',
+      url: cloudinaryUrls.step8_results,
+      description: 'Green rectangles detection'
+    }
+  ]
 
   return (
     <motion.div
@@ -423,12 +273,15 @@ export function AnalysisResults({ fileName, result, onReset }: AnalysisResultsPr
             <div className="space-y-1">
               <CardTitle className="flex items-center gap-2">
                 <FileText className="h-5 w-5 text-primary" />
-                Analysis Complete
+                AI-Takeoff Analysis Complete
               </CardTitle>
               <CardDescription className="flex items-center gap-2">
                 <span>{fileName}</span>
                 <Badge variant="secondary" className="text-xs">
-                  PDF Document
+                  {formatFileSize(analysisData.pdf_size)}
+                </Badge>
+                <Badge variant="outline" className="text-xs">
+                  {analysisData.status}
                 </Badge>
               </CardDescription>
             </div>
@@ -449,50 +302,325 @@ export function AnalysisResults({ fileName, result, onReset }: AnalysisResultsPr
         </CardHeader>
       </Card>
 
-      {/* Structured Data Display */}
-      {hasStructuredData && renderStructuredData()}
-
-      {/* Raw Data Display */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Detailed Analysis</CardTitle>
-              <CardDescription>AI-powered insights and recommendations</CardDescription>
+      {/* Main Content with Accordions */}
+      <Accordion type="multiple" defaultValue={["overview", "results"]} className="space-y-4">
+        
+        {/* Overview Accordion */}
+        <AccordionItem value="overview">
+          <AccordionTrigger className="text-left">
+            <div className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5" />
+              <span>Processing Overview & Summary</span>
             </div>
-            <Button variant="outline" size="sm" onClick={handleCopy} className="gap-2 bg-transparent">
-              <motion.div animate={{ scale: copied ? 1.1 : 1 }} transition={{ duration: 0.1 }}>
-                {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
-              </motion.div>
-              {copied ? "Copied!" : "Copy"}
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="relative">
-            <div className="bg-muted/30 rounded-lg p-6 max-h-96 overflow-y-auto border">
-              <pre className="text-sm whitespace-pre-wrap font-mono leading-relaxed text-foreground">
-                {typeof result === 'string' ? result : JSON.stringify(result, null, 2)}
-              </pre>
+          </AccordionTrigger>
+          <AccordionContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <BarChart3 className="h-5 w-5" />
+                    Processing Summary
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">PDF Size:</span>
+                    <span className="font-medium">{formatFileSize(analysisData.pdf_size)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">SVG Size:</span>
+                    <span className="font-medium">{formatFileSize(analysisData.svg_size)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Processing ID:</span>
+                    <span className="font-mono text-xs">{analysisData.id}</span>
+                  </div>
+                  <Separator />
+                  <div className="text-sm text-muted-foreground">
+                    {analysisData.message}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Hash className="h-5 w-5" />
+                    Quick Detection Stats
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-4">
+                    {stepConfigs.map((step) => {
+                      const IconComponent = step.icon
+                      return (
+                        <div key={step.key} className="flex items-center gap-3">
+                          <div className={`w-3 h-3 rounded-full ${step.color}`} />
+                          <div className="flex-1">
+                            <div className="text-sm font-medium">{step.count}</div>
+                            <div className="text-xs text-muted-foreground">{step.title}</div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
             </div>
+          </AccordionContent>
+        </AccordionItem>
 
-            {/* Gradient overlay for better readability */}
-            <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-muted/30 to-transparent pointer-events-none rounded-b-lg" />
-          </div>
+        {/* Step Results Accordion */}
+        <AccordionItem value="results">
+          <AccordionTrigger className="text-left">
+            <div className="flex items-center gap-2">
+              <Hash className="h-5 w-5" />
+              <span>Detailed Detection Results</span>
+              <Badge variant="secondary" className="ml-2">
+                {stepConfigs.reduce((sum, step) => sum + step.count, 0)} total
+              </Badge>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent>
+            <Card className="mt-4">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5" />
+                  AI-Powered Shape Detection Results
+                </CardTitle>
+                <CardDescription>
+                  Detailed analysis of detected structural elements and components
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {stepConfigs.map((step) => {
+                    const IconComponent = step.icon
+                    return (
+                      <motion.div
+                        key={step.key}
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ duration: 0.2, delay: stepConfigs.indexOf(step) * 0.1 }}
+                      >
+                        <Card className="border-l-4 border-l-primary/20">
+                          <CardContent className="p-4">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <div className={`p-2 rounded-lg ${step.color} bg-opacity-10`}>
+                                  <IconComponent className={`h-5 w-5 ${step.color.replace('bg-', 'text-')}`} />
+                                </div>
+                                <div>
+                                  <div className="font-semibold">{step.title}</div>
+                                  <div className="text-sm text-muted-foreground">{step.description}</div>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <div className="text-2xl font-bold">{step.count}</div>
+                                <div className="text-xs text-muted-foreground">detected</div>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </motion.div>
+                    )
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          </AccordionContent>
+        </AccordionItem>
 
-          <Separator className="my-4" />
+        {/* Visual Analysis Accordion */}
+        <AccordionItem value="images">
+          <AccordionTrigger className="text-left">
+            <div className="flex items-center gap-2">
+              <ImageIcon className="h-5 w-5" />
+              <span>Visual Analysis Results</span>
+              <Badge variant="secondary" className="ml-2">
+                {imageSteps.length} images
+              </Badge>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent>
+            <Card className="mt-4">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ImageIcon className="h-5 w-5" />
+                  Step-by-Step Processing Images
+                </CardTitle>
+                <CardDescription>
+                  Visual documentation of the AI analysis process and detection results
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {imageSteps.map((step, index) => (
+                    <motion.div
+                      key={step.key}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.3, delay: index * 0.1 }}
+                    >
+                      <Card className="overflow-hidden hover:shadow-lg transition-shadow">
+                        <div className="aspect-square relative">
+                          <img
+                            src={step.url}
+                            alt={step.title}
+                            className="w-full h-full object-cover cursor-pointer"
+                            onClick={() => setSelectedImage(step.url)}
+                          />
+                          <div className="absolute inset-0 bg-black/0 hover:bg-black/10 transition-colors flex items-center justify-center">
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              className="opacity-0 hover:opacity-100 transition-opacity"
+                              onClick={() => setSelectedImage(step.url)}
+                            >
+                              <ZoomIn className="h-4 w-4 mr-2" />
+                              View
+                            </Button>
+                          </div>
+                        </div>
+                        <CardContent className="p-3">
+                          <div className="font-medium text-sm">{step.title}</div>
+                          <div className="text-xs text-muted-foreground">{step.description}</div>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </AccordionContent>
+        </AccordionItem>
 
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>Analysis generated on {new Date().toLocaleDateString()}</span>
-            <span>
-              {typeof result === 'string' 
-                ? `${result.split(" ").length} words • ${result.split("\n").length} lines`
-                : `${JSON.stringify(result).split(" ").length} words • ${JSON.stringify(result).split("\n").length} lines`
-              }
-            </span>
-          </div>
-        </CardContent>
-      </Card>
+        {/* Text Analysis Accordion */}
+        <AccordionItem value="text">
+          <AccordionTrigger className="text-left">
+            <div className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              <span>
+                {showRewritten && rewrittenText ? "AI-Enhanced Engineering Analysis" : "Extracted Text Analysis"}
+              </span>
+              {rewrittenText && (
+                <Badge variant="outline" className="ml-2">
+                  AI Enhanced
+                </Badge>
+              )}
+            </div>
+          </AccordionTrigger>
+          <AccordionContent>
+            <Card className="mt-4">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <FileText className="h-5 w-5" />
+                      {showRewritten && rewrittenText ? "Professional Engineering Analysis" : "Document Text Extraction"}
+                    </CardTitle>
+                    <CardDescription>
+                      {showRewritten && rewrittenText 
+                        ? "Comprehensive structural engineering analysis with professional formatting"
+                        : "Raw text content extracted from the PDF document"
+                      }
+                    </CardDescription>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {rewrittenText && (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => setShowRewritten(!showRewritten)}
+                        className="gap-2"
+                      >
+                        {showRewritten ? "Show Original" : "Show Enhanced"}
+                      </Button>
+                    )}
+                    {!rewrittenText && (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={handleRewriteText}
+                        disabled={isRewriting}
+                        className="gap-2"
+                      >
+                        <motion.div 
+                          animate={{ rotate: isRewriting ? 360 : 0 }} 
+                          transition={{ duration: 1, repeat: isRewriting ? Infinity : 0 }}
+                        >
+                          {isRewriting ? <RefreshCw className="h-4 w-4" /> : <Wand2 className="h-4 w-4" />}
+                        </motion.div>
+                        {isRewriting ? "Enhancing..." : "Enhance with AI"}
+                      </Button>
+                    )}
+                    <Button variant="outline" size="sm" onClick={handleCopy} className="gap-2">
+                      <motion.div animate={{ scale: copied ? 1.1 : 1 }} transition={{ duration: 0.1 }}>
+                        {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                      </motion.div>
+                      {copied ? "Copied!" : "Copy Text"}
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="relative">
+                  <div className="bg-muted/30 rounded-lg p-6 max-h-96 overflow-y-auto border">
+                    {isRewriting ? (
+                      <div className="flex items-center justify-center py-8">
+                        <div className="flex items-center gap-3">
+                          <motion.div
+                            animate={{ rotate: 360 }}
+                            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                          >
+                            <RefreshCw className="h-5 w-5 text-primary" />
+                          </motion.div>
+                          <span className="text-sm text-muted-foreground">AI is enhancing the text...</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-sm leading-relaxed text-foreground">
+                        {renderMarkdown(showRewritten && rewrittenText ? rewrittenText : extractedText)}
+                      </div>
+                    )}
+                  </div>
+                  <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-background to-transparent pointer-events-none rounded-b-lg" />
+                </div>
+                <Separator className="my-4" />
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>
+                    {showRewritten && rewrittenText 
+                      ? "Engineering analysis completed on " + new Date().toLocaleDateString()
+                      : "Text extracted on " + new Date().toLocaleDateString()
+                    }
+                  </span>
+                  <span>
+                    {(showRewritten && rewrittenText ? rewrittenText : extractedText).split(" ").length} words • {(showRewritten && rewrittenText ? rewrittenText : extractedText).split("\n").length} lines
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+
+      {/* Image Modal */}
+      <Dialog open={!!selectedImage} onOpenChange={() => setSelectedImage(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] p-0">
+          <DialogHeader className="p-6 pb-0">
+            <DialogTitle>Analysis Result Image</DialogTitle>
+          </DialogHeader>
+          {selectedImage && (
+            <div className="p-6 pt-0">
+              <img
+                src={selectedImage}
+                alt="Analysis result"
+                className="w-full h-auto max-h-[70vh] object-contain rounded-lg"
+              />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </motion.div>
   )
 }
