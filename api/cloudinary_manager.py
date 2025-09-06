@@ -1,4 +1,7 @@
 import os
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
 import cloudinary
 import cloudinary.uploader
 from pathlib import Path
@@ -23,6 +26,7 @@ class CloudinaryManager:
         )
         
         self.folder = "final_AI_TakeOff"
+        
         print(f"✅ Cloudinary configured successfully for folder: {self.folder}")
     
     def upload_image(self, file_path: str, public_id: str) -> Optional[str]:
@@ -38,11 +42,13 @@ class CloudinaryManager:
         """
         try:
             if not os.path.exists(file_path):
-                print(f"❌ File not found: {file_path}")
+                
+                print(f"❌ File not found: {file_path}", "error")
                 return None
             
             # Create the full public ID with folder
             full_public_id = f"{self.folder}/{public_id}"
+            
             
             print(f"📤 Uploading {file_path} to Cloudinary as {full_public_id}...")
             
@@ -59,11 +65,12 @@ class CloudinaryManager:
                 print(f"✅ Successfully uploaded to: {url}")
                 return url
             else:
-                print(f"❌ Upload failed - no URL returned")
+                print(f"❌ Upload failed - no URL returned", "error")
                 return None
                 
         except Exception as e:
-            print(f"❌ Error uploading {file_path} to Cloudinary: {str(e)}")
+            
+            print(f"❌ Error uploading {file_path} to Cloudinary: {str(e)}", "error")
             return None
     
     def upload_processing_results(self, step_results: Dict[str, int]) -> Dict[str, str]:
@@ -96,7 +103,9 @@ class CloudinaryManager:
                 if url:
                     uploaded_urls[step_name] = url
             else:
-                print(f"⚠️  File not found: {file_path}")
+                
+                print(f"⚠️  File not found: {file_path}", "warning")
+        
         
         print(f"📊 Uploaded {len(uploaded_urls)} PNG result images to Cloudinary")
         return uploaded_urls
@@ -111,6 +120,7 @@ def get_cloudinary_manager() -> CloudinaryManager:
         try:
             cloudinary_manager = CloudinaryManager()
         except ValueError as e:
-            print(f"⚠️  Cloudinary not configured: {e}")
+            
+            print(f"⚠️  Cloudinary not configured: {e}", "warning")
             return None
     return cloudinary_manager

@@ -1,5 +1,9 @@
 import re
 import os
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+from processors.websocket_utils import sync_websocket_print
+
 
 # ====== SETTING ELEMENTS COLOR LIGHTGRAY AND BLACK SLABBANDS ====== #
 
@@ -47,7 +51,8 @@ def modify_svg_stroke_and_fill(svg_text, black_stroke="#000000", white_stroke="#
         return modified_svg_text
 
     except Exception as e:
-        print(f"Error modifying SVG colors: {e}")
+        
+        sync_websocket_print(f"Error modifying SVG colors: {e}")
         return svg_text
 
 def run_step2():
@@ -69,9 +74,9 @@ def run_step2():
         
         # Check if input file exists
         if not os.path.exists(input_svg):
-            print(f"Error: Input file '{input_svg}' not found!")
-            print(f"Current working directory: {os.getcwd()}")
-            print(f"Tried path: {input_svg}")
+            sync_websocket_print(f"Error: Input file '{input_svg}' not found!")
+            sync_websocket_print(f"Current working directory: {os.getcwd()}")
+            sync_websocket_print(f"Tried path: {input_svg}")
             return False
         
         # Read the input file
@@ -79,20 +84,22 @@ def run_step2():
             svg_text = file.read()
         
         # Modify the colors
-        print("Modifying colors...")
+        
+        sync_websocket_print("Modifying colors...")
         final_svg = modify_svg_stroke_and_fill(svg_text)
         
         # Write the final result
         with open(output_svg, "w", encoding="utf-8") as file:
             file.write(final_svg)
         
-        print(f"✅ Step2 completed successfully:")
-        print(f"   - Input SVG: {input_svg}")
-        print(f"   - Processed SVG: {output_svg}")
+        
+        sync_websocket_print(f"✅ Step2 completed successfully:")
+        sync_websocket_print(f"   - Input SVG: {input_svg}")
+        sync_websocket_print(f"   - Processed SVG: {output_svg}")
         return True
             
     except Exception as e:
-        print(f"An error occurred: {str(e)}")
+        sync_websocket_print(f"An error occurred: {str(e)}")
         return False
 
 # Main execution

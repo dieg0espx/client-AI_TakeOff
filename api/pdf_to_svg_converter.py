@@ -1,6 +1,9 @@
 import os
 import asyncio
 import requests
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -159,6 +162,7 @@ async def convert_drive_pdf_to_svg(request: FileConversionRequest, background_ta
     """
     try:
         # Step 1: Download PDF from Google Drive
+        
         print(f"Downloading PDF from Google Drive with file ID: {request.file_id}")
         pdf_path = download_pdf_from_drive(file_id=request.file_id, output_folder="files")
         

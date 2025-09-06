@@ -17,6 +17,9 @@ from datetime import datetime
 import cairosvg
 import io
 from PIL import Image
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+from processors.websocket_utils import sync_websocket_print
+
 
 def svg_to_image(svg_path, output_path=None):
     """Convert SVG to PIL Image"""
@@ -30,20 +33,23 @@ def svg_to_image(svg_path, output_path=None):
         if output_path:
             # Save as PNG if output path is provided
             image.save(output_path, 'PNG')
-            print(f"SVG converted and saved as: {output_path}")
+            
+            sync_websocket_print(f"SVG converted and saved as: {output_path}")
         
         return image
     except Exception as e:
-        print(f"Error converting SVG to image: {e}")
+        
+        sync_websocket_print(f"Error converting SVG to image: {e}", "error")
         return None
 
 def detect_pink_shapes(image_path, output_path='pink_results.png'):
     """Detect individual pink shapes using contour detection"""
-    print(f"Processing image: {image_path}")
+    
+    sync_websocket_print(f"Processing image: {image_path}")
     
     # Check if input is SVG and convert if needed
     if str(image_path).lower().endswith('.svg'):
-        print("Converting SVG to image for processing...")
+        sync_websocket_print("Converting SVG to image for processing...")
         pil_image = svg_to_image(image_path)
         if pil_image is None:
             return 0
@@ -55,7 +61,7 @@ def detect_pink_shapes(image_path, output_path='pink_results.png'):
         img = cv2.imread(str(image_path))
     
     if img is None:
-        print(f"Error: Could not read image {image_path}")
+        sync_websocket_print(f"Error: Could not read image {image_path}", "error")
         return 0
     
     # Convert to HSV for better color detection
@@ -96,7 +102,7 @@ def detect_pink_shapes(image_path, output_path='pink_results.png'):
             if w >= 3 and h >= 3:  # Minimum size requirement
                 valid_contours.append((contour, x, y, w, h, area))
     
-    print(f"Found {len(valid_contours)} initial pink contours")
+    sync_websocket_print(f"Found {len(valid_contours)} initial pink contours")
     
     # Group nearby contours to identify individual pink shapes
     if len(valid_contours) > 0:
@@ -146,7 +152,7 @@ def detect_pink_shapes(image_path, output_path='pink_results.png'):
                 grouped_contours.append((nearby_contours, min_x, min_y, group_w, group_h))
         
         valid_contours = grouped_contours
-        print(f"Grouped into {len(valid_contours)} pink shapes")
+        sync_websocket_print(f"Grouped into {len(valid_contours)} pink shapes")
     
     # Draw results
     result_img = img.copy()
@@ -167,7 +173,7 @@ def detect_pink_shapes(image_path, output_path='pink_results.png'):
         
         # Calculate total area for this shape
         total_area = sum(c[5] for c in contours_group)
-        print(f"Pink{i+1}: Size={w:.1f}x{h:.1f}, Area={total_area:.1f}, Contours={len(contours_group)}")
+        sync_websocket_print(f"Pink{i+1}: Size={w:.1f}x{h:.1f}, Area={total_area:.1f}, Contours={len(contours_group)}")
     
     # Save result
     if output_path.lower().endswith('.svg'):
@@ -176,12 +182,12 @@ def detect_pink_shapes(image_path, output_path='pink_results.png'):
         # For now, save as PNG with SVG extension (you might want to convert back to SVG)
         png_path = output_path.replace('.svg', '.png')
         cv2.imwrite(png_path, result_img)
-        print(f"Result saved as: {png_path} (PNG format)")
+        sync_websocket_print(f"Result saved as: {png_path} (PNG format)")
     else:
         cv2.imwrite(output_path, result_img)
-        print(f"Result saved as: {output_path}")
+        sync_websocket_print(f"Result saved as: {output_path}")
     
-    print(f"Total pink shapes detected: {len(valid_contours)}")
+    sync_websocket_print(f"Total pink shapes detected: {len(valid_contours)}")
     
     return len(valid_contours)
 
@@ -357,14 +363,17 @@ def process_svg_colors(input_svg, output_svg):
         with open(output_svg, 'w', encoding='utf-8') as file:
             file.write(processed_content)
         
-        print("SVG processing completed!")
-        print("Original colors replaced with #202124 (except #ff00cd)")
-        print(f"Output saved to: {output_svg}")
+        
+        sync_websocket_print("SVG processing completed!")
+        sync_websocket_print("Original colors replaced with #202124 (except #ff00cd)")
+        sync_websocket_print(f"Output saved to: {output_svg}")
         
     except FileNotFoundError:
-        print(f"Error: Could not find input file {input_svg}")
+        
+        sync_websocket_print(f"Error: Could not find input file {input_svg}", "error")
     except Exception as e:
-        print(f"Error processing SVG: {e}")
+        
+        sync_websocket_print(f"Error processing SVG: {e}", "error")
 
 def run_step7():
     """
@@ -389,14 +398,16 @@ def run_step7():
         process_svg_colors(input_svg, output_svg)
         
         # Then detect pink shapes on the processed SVG
-        print(f"Detecting pink shapes in: {output_svg}")
+        
+        sync_websocket_print(f"Detecting pink shapes in: {output_svg}")
         count = detect_pink_shapes(output_svg, output_results)
-        print(f"\nFinal count: {count} pink shapes")
+        sync_websocket_print(f"\nFinal count: {count} pink shapes")
         
         return True
         
     except Exception as e:
-        print(f"Error in processing: {e}")
+        
+        sync_websocket_print(f"Error in processing: {e}", "error")
         return False
 
 def main():
@@ -411,12 +422,14 @@ def main():
     # Check if source exists
     source_path = Path(args.source)
     if not source_path.exists():
-        print(f"Error: Source not found at {source_path}")
+            
+            sync_websocket_print(f"Error: Source not found at {source_path}", "error")
         return
     
     # Detect pink shapes
     count = detect_pink_shapes(source_path, args.output)
-    print(f"\nFinal count: {count} pink shapes")
+    
+    sync_websocket_print(f"\nFinal count: {count} pink shapes")
 
 if __name__ == "__main__":
     try:
@@ -438,9 +451,11 @@ if __name__ == "__main__":
         process_svg_colors(input_svg, output_svg)
         
         # Then detect pink shapes on the processed SVG
-        print(f"Detecting pink shapes in: {output_svg}")
+        
+        sync_websocket_print(f"Detecting pink shapes in: {output_svg}")
         count = detect_pink_shapes(output_svg, output_results)
-        print(f"\nFinal count: {count} pink shapes")
+        sync_websocket_print(f"\nFinal count: {count} pink shapes")
         
     except Exception as e:
-        print(f"Error in processing: {e}")
+        
+        sync_websocket_print(f"Error in processing: {e}", "error")

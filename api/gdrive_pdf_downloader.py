@@ -1,5 +1,8 @@
 import requests
 import os
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
 from typing import Optional
 
 # Global variable to store upload_id (will be set from main.py)
@@ -9,6 +12,7 @@ def set_global_upload_id(upload_id: str):
     """Set the global upload_id variable"""
     global global_upload_id
     global_upload_id = upload_id
+    
     print(f"📝 Global upload_id set to: {global_upload_id}")
 
 def get_global_upload_id() -> Optional[str]:
@@ -35,12 +39,14 @@ def download_pdf_from_drive(file_id: str = None, output_folder: str = "files") -
         file_id = get_global_upload_id()
         if file_id is None:
             raise Exception("No file_id provided and no global upload_id set")
+        
         print(f"Using global upload_id: {file_id}")
     
     # Google Drive download URL template
     GOOGLE_DRIVE_DOWNLOAD_URL = "https://drive.google.com/uc?export=download&id="
     
     try:
+        
         print(f"Attempting to download file with ID: {file_id}")
         
         # Create output folder if it doesn't exist
@@ -62,7 +68,7 @@ def download_pdf_from_drive(file_id: str = None, output_folder: str = "files") -
         # Check if we got a PDF file
         content_type = response.headers.get('content-type', '')
         if 'application/pdf' not in content_type and 'application/octet-stream' not in content_type:
-            print(f"Warning: Unexpected content type: {content_type}")
+            print(f"Warning: Unexpected content type: {content_type}", "warning")
 
         # Save the file as original.pdf
         file_path = os.path.join(output_folder, "original.pdf")
@@ -75,10 +81,12 @@ def download_pdf_from_drive(file_id: str = None, output_folder: str = "files") -
         return file_path
 
     except requests.exceptions.RequestException as e:
-        print(f"Request error: {str(e)}")
+        
+        print(f"Request error: {str(e)}", "error")
         raise Exception(f"Download failed: {str(e)}")
     except Exception as e:
-        print(f"Unexpected error: {str(e)}")
+        
+        print(f"Unexpected error: {str(e)}", "error")
         raise Exception(str(e))
 
 def download_with_global_id(output_folder: str = "files") -> str:
@@ -112,6 +120,7 @@ def main():
         
         # Download using global ID
         file_path = download_with_global_id()
+        
         print(f"Successfully downloaded PDF to: {file_path}")
         
         # Or download with specific file_id
@@ -119,7 +128,8 @@ def main():
         # print(f"Successfully downloaded PDF to: {file_path}")
         
     except Exception as e:
-        print(f"Error downloading file: {e}")
+        
+        print(f"Error downloading file: {e}", "error")
 
 if __name__ == "__main__":
     main()
