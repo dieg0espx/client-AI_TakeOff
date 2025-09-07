@@ -6,10 +6,15 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import sys
 import os
+import json
+import asyncio
+import shutil
 from dotenv import load_dotenv
+from datetime import datetime
 
 # Load environment variables from .env file
 load_dotenv()
+
 
 # Add the api directory to the Python path
 sys.path.append(os.path.join(os.path.dirname(__file__), 'api'))
@@ -24,8 +29,7 @@ from pdf_to_svg_converter import ConvertioConverter
 # Import the PDF text extractor
 from api.pdf_text_extractor import extract_text_from_pdf
 
-# Import the processing pipeline
-from processors.index import main as run_pipeline
+
 
 # Create FastAPI instance
 app = FastAPI(
@@ -33,6 +37,85 @@ app = FastAPI(
     description="AI-Takeoff API server",
     version="1.0.0"
 )
+
+
+# Custom logging function
+async def log_to_client(upload_id: str, message: str, log_type: str = "info"):
+    """Log message to console"""
+    print(message)
+
+
+# Cleanup function to clear files and reset data.json
+def cleanup_after_response():
+    """Clear the files folder and reset data.json after response is sent"""
+    try:
+        # Clear the files folder
+        files_dir = "files"
+        if os.path.exists(files_dir):
+            # Remove all files in the files directory
+            for filename in os.listdir(files_dir):
+                file_path = os.path.join(files_dir, filename)
+                try:
+                    if os.path.isfile(file_path) or os.path.islink(file_path):
+                        os.unlink(file_path)
+                    elif os.path.isdir(file_path):
+                        shutil.rmtree(file_path)
+                except Exception as e:
+                    print(f"Failed to delete {file_path}. Reason: {e}")
+            print("✅ Files folder cleared successfully")
+        else:
+            print("⚠️  Files directory does not exist")
+        
+        # Reset data.json to empty structure
+        data_json_path = "data.json"
+        empty_data = {
+            "step_results": {},
+            "cloudinary_urls": {},
+            "extracted_text": ""
+        }
+        
+        with open(data_json_path, 'w') as f:
+            json.dump(empty_data, f, indent=4)
+        
+        print("✅ data.json reset to empty structure")
+        
+    except Exception as e:
+        print(f"❌ Error during cleanup: {e}")
+
+
+
+# Modified pipeline runner with logging support
+def run_pipeline_with_logging(upload_id: str):
+    """Run the processing pipeline with logging using the proper pipeline from processors/index.py"""
+    import sys
+    import os
+    
+    # Add processors directory to Python path
+    processors_dir = os.path.abspath("processors")
+    if processors_dir not in sys.path:
+        sys.path.insert(0, processors_dir)
+    
+    try:
+        # Import the main function from processors/index.py
+        from index import main as pipeline_main
+        
+        print(f"\n{'='*60}")
+        print(f"🚀 Starting AI TakeOff Processing Pipeline")
+        print(f"{'='*60}")
+        
+        # Run the proper pipeline that includes data.json population
+        success = pipeline_main(upload_id)
+        
+        if success:
+            print(f"🎉 All steps completed successfully!")
+        else:
+            print(f"⚠️  Pipeline completed with some failures")
+        
+        return success
+        
+    except Exception as e:
+        print(f"❌ Error running pipeline: {str(e)}")
+        return False
 
 # Initialize the PDF to SVG converter
 try:
@@ -59,7 +142,8 @@ async def root():
 # Health check endpoint
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "timestamp": "2024-01-01T00:00:00Z"}
+    return {"status": "healthy", "message": "Server is running properly"}
+
 
 # AI-Takeoff specific endpoint
 @app.get("/AI-Takeoff/{upload_id}")
@@ -73,20 +157,16 @@ async def get_ai_takeoff_result(upload_id: str, background_tasks: BackgroundTask
     # Force synchronous processing by default, or if sync=True
     if sync:
         print(f"🔄 Running in synchronous mode...")
-        return await process_ai_takeoff_sync(upload_id)
+        result = await process_ai_takeoff_sync(upload_id)
     else:
-        # Start background processing
-        if background_tasks:
-            background_tasks.add_task(process_ai_takeoff, upload_id)
-            
-            return {
-                "id": upload_id,
-                "status": "processing",
-                "message": "AI-Takeoff processing started."
-            }
-        else:
-            # Fallback to synchronous processing
-            return await process_ai_takeoff_sync(upload_id)
+        # Fallback to synchronous processing
+        result = await process_ai_takeoff_sync(upload_id)
+    
+    # Add cleanup task to run after response is sent
+    if background_tasks:
+        background_tasks.add_task(cleanup_after_response)
+    
+    return result
 
 # Extract text from PDF endpoint
 @app.get("/extract-text/{upload_id}")
@@ -132,7 +212,7 @@ async def extract_pdf_text(upload_id: str):
 
 # Get results endpoint
 @app.get("/AI-Takeoff/{upload_id}/results")
-async def get_ai_takeoff_results(upload_id: str):
+async def get_ai_takeoff_results(upload_id: str, background_tasks: BackgroundTasks = None):
     """Get the results from data.json for a specific upload_id"""
     data_json_path = os.path.join('data.json')
     
@@ -150,11 +230,17 @@ async def get_ai_takeoff_results(upload_id: str):
         
         # Check if this result belongs to the requested upload_id
         if data_results.get('upload_id') == upload_id:
-            return {
+            result = {
                 "id": upload_id,
                 "status": "completed",
                 "results": data_results
             }
+            
+            # Add cleanup task to run after response is sent
+            if background_tasks:
+                background_tasks.add_task(cleanup_after_response)
+            
+            return result
         else:
             return {
                 "id": upload_id,
@@ -170,131 +256,65 @@ async def get_ai_takeoff_results(upload_id: str):
             "message": "Error reading results file"
         }
 
-async def process_ai_takeoff(upload_id: str):
-    """Process AI-Takeoff request"""
-    try:
-        print(f"📄 Starting PDF download for upload_id: {upload_id}")
-        
-        # Step 1: Download the PDF
-        file_path = download_pdf_from_drive(upload_id)
-        print(f"📄 PDF downloaded successfully to: {file_path}")
-        
-        # Step 2: Convert PDF to SVG
-        if converter:
-            print(f"🔄 Starting PDF to SVG conversion...")
-            try:
-                # Start conversion process
-                conv_id = await converter.start_conversion()
-                print(f"🔄 Conversion started with ID: {conv_id}")
-                
-                # Upload the file
-                await converter.upload_file(conv_id, file_path)
-                print(f"📤 PDF uploaded to conversion service")
-                
-                # Wait for conversion to complete
-                download_url = await converter.check_status(conv_id)
-                print(f"✅ Conversion completed, downloading SVG...")
-                
-                # Download the converted file
-                svg_path = os.path.join('files', 'original.svg')
-                await converter.download_file(download_url, svg_path)
-                print(f"✅ SVG saved to: {svg_path}")
-                
-                # Get file sizes
-                pdf_size = os.path.getsize(file_path) if os.path.exists(file_path) else 0
-                svg_size = os.path.getsize(svg_path) if os.path.exists(svg_path) else 0
-                
-                print(f"📊 File sizes - PDF: {pdf_size} bytes, SVG: {svg_size} bytes")
-                
-                # Start the processing pipeline
-                print(f"🚀 Starting AI processing pipeline...")
-                try:
-                    pipeline_success = run_pipeline()
-                    if pipeline_success:
-                        print(f"✅ Processing pipeline completed successfully")
-                    else:
-                        print(f"⚠️  Processing pipeline completed with some failures")
-                except Exception as pipeline_error:
-                    print(f"❌ Error in processing pipeline: {pipeline_error}")
-                
-            except Exception as conversion_error:
-                print(f"❌ Error in SVG conversion: {conversion_error}")
-        else:
-            print("⚠️  Skipping SVG conversion - CONVERTIO_API_KEY not set")
-        
-        print(f"✅ AI-Takeoff processing completed for upload_id: {upload_id}")
-        
-        # Update data.json with the upload_id for tracking
-        data_json_path = os.path.join('data.json')
-        if os.path.exists(data_json_path):
-            try:
-                with open(data_json_path, 'r') as f:
-                    import json
-                    data_results = json.load(f)
-                
-                # Add upload_id to the results
-                data_results['upload_id'] = upload_id
-                
-                with open(data_json_path, 'w') as f:
-                    json.dump(data_results, f, indent=4)
-                
-                print(f"✅ Updated data.json with upload_id: {upload_id}")
-            except Exception as e:
-                print(f"❌ Error updating data.json: {e}")
-        
-    except Exception as e:
-        print(f"❌ Error in AI-Takeoff processing: {e}")
 
 async def process_ai_takeoff_sync(upload_id: str):
     """Synchronous processing"""
     try:
-        print(f"📄 Starting PDF download for upload_id: {upload_id}")
+        await log_to_client(upload_id, f"📄 Starting PDF download for upload_id: {upload_id}")
         
         # Step 1: Download the PDF
         file_path = download_pdf_from_drive(upload_id)
-        print(f"📄 PDF downloaded successfully to: {file_path}")
+        await log_to_client(upload_id, f"📄 PDF downloaded successfully to: {file_path}")
+        
+        # Step 1.5: Extract text from PDF
+        await log_to_client(upload_id, f"📖 Extracting text from PDF...")
+        try:
+            extracted_text = extract_text_from_pdf(file_path)
+            await log_to_client(upload_id, f"✅ Text extraction completed, {len(extracted_text)} characters extracted")
+        except Exception as text_error:
+            await log_to_client(upload_id, f"⚠️  Text extraction failed: {text_error}", "warning")
         
         # Step 2: Convert PDF to SVG
         svg_path = None
         svg_size = None
         
         if converter:
-            print(f"🔄 Starting PDF to SVG conversion...")
+            await log_to_client(upload_id, f"🔄 Starting PDF to SVG conversion...")
             try:
                 # Start conversion process
                 conv_id = await converter.start_conversion()
-                print(f"🔄 Conversion started with ID: {conv_id}")
+                await log_to_client(upload_id, f"🔄 Conversion started with ID: {conv_id}")
                 
                 # Upload the file
                 await converter.upload_file(conv_id, file_path)
-                print(f"📤 PDF uploaded to conversion service")
+                await log_to_client(upload_id, f"📤 PDF uploaded to conversion service")
                 
                 # Wait for conversion to complete
                 download_url = await converter.check_status(conv_id)
-                print(f"✅ Conversion completed, downloading SVG...")
+                await log_to_client(upload_id, f"✅ Conversion completed, downloading SVG...")
                 
                 # Download the converted file
                 svg_path = os.path.join('files', 'original.svg')
                 await converter.download_file(download_url, svg_path)
-                print(f"✅ SVG saved to: {svg_path}")
+                await log_to_client(upload_id, f"✅ SVG saved to: {svg_path}")
                 
                 svg_size = os.path.getsize(svg_path) if os.path.exists(svg_path) else 0
                 
                 # Start the processing pipeline
-                print(f"🚀 Starting AI processing pipeline...")
+                await log_to_client(upload_id, f"🚀 Starting AI processing pipeline...")
                 try:
-                    pipeline_success = run_pipeline()
+                    pipeline_success = run_pipeline_with_logging(upload_id)
                     if pipeline_success:
-                        print(f"✅ Processing pipeline completed successfully")
+                        await log_to_client(upload_id, f"✅ Processing pipeline completed successfully")
                     else:
-                        print(f"⚠️  Processing pipeline completed with some failures")
+                        await log_to_client(upload_id, f"⚠️  Processing pipeline completed with some failures")
                 except Exception as pipeline_error:
-                    print(f"❌ Error in processing pipeline: {pipeline_error}")
+                    await log_to_client(upload_id, f"❌ Error in processing pipeline: {pipeline_error}", "error")
                 
             except Exception as conversion_error:
-                print(f"❌ Error in SVG conversion: {conversion_error}")
+                await log_to_client(upload_id, f"❌ Error in SVG conversion: {conversion_error}", "error")
         else:
-            print("⚠️  Skipping SVG conversion - CONVERTIO_API_KEY not set")
+            await log_to_client(upload_id, f"⚠️  Skipping SVG conversion - CONVERTIO_API_KEY not set", "warning")
         
         # Get file sizes
         pdf_size = os.path.getsize(file_path) if os.path.exists(file_path) else 0
@@ -318,7 +338,7 @@ async def process_ai_takeoff_sync(upload_id: str):
                     "results": data_results
                 }
             except Exception as e:
-                print(f"❌ Error reading data.json: {e}")
+                await log_to_client(upload_id, f"❌ Error reading data.json: {e}", "error")
                 result = {
                     "id": upload_id,
                     "status": "completed",
@@ -340,7 +360,7 @@ async def process_ai_takeoff_sync(upload_id: str):
             }
         
     except Exception as e:
-        print(f"❌ Error downloading PDF: {e}")
+        await log_to_client(upload_id, f"❌ Error downloading PDF: {e}", "error")
         
         result = {
             "id": upload_id,
@@ -349,11 +369,15 @@ async def process_ai_takeoff_sync(upload_id: str):
             "message": "Failed to download PDF from Google Drive"
         }
     
-    # Print to console
-    print(f"📊 Result: {result}")
-    print("-" * 50)
+    # Log final result
+    await log_to_client(upload_id, f"📊 Result: {result}")
+    await log_to_client(upload_id, "-" * 50)
     
     return result
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=5001)
+    # Railway provides PORT environment variable
+    port = int(os.environ.get("PORT", 5001))
+    print(f"🚀 Starting server on port {port}")
+    print(f"🌐 Environment: {os.environ.get('RAILWAY_ENVIRONMENT', 'local')}")
+    uvicorn.run(app, host="0.0.0.0", port=port)

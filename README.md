@@ -102,7 +102,7 @@ curl -X POST "http://localhost:5001/users" \
 
 The server automatically uploads processing result images to Cloudinary in the `final_AI_TakeOff` folder after the processing pipeline completes. The Cloudinary manager is located in `api/cloudinary_manager.py` and is called from the processors pipeline. This includes:
 
-- Original SVG drawing
+- Original SVG drawing (converted to PNG format)
 - Step-by-step processing results (Step1.svg through Step8.svg)
 - Detection result images (Step4-results.png through Step8-results.png)
 
@@ -111,7 +111,7 @@ The Cloudinary URLs are stored in the `data.json` file under the `cloudinary_url
 ### Cloudinary Folder Structure
 ```
 final_AI_TakeOff/
-├── original_drawing
+├── original (PNG format)
 ├── step1_duplicate_removal
 ├── step2_color_modification
 ├── step3_background_addition

@@ -1,13 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-// Database configuration
-const DB_CONFIG = {
-  host: 'localhost',
-  database: 'u969084943_ai_takeOff',
-  username: 'u969084943_admin',
-  password: 'Construction2020?'
-}
-
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)

@@ -17,6 +17,8 @@ from datetime import datetime
 import cairosvg
 import io
 from PIL import Image
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
 
 def svg_to_image(svg_path, output_path=None):
     """Convert SVG to PIL Image"""
@@ -30,15 +32,18 @@ def svg_to_image(svg_path, output_path=None):
         if output_path:
             # Save as PNG if output path is provided
             image.save(output_path, 'PNG')
+            
             print(f"SVG converted and saved as: {output_path}")
         
         return image
     except Exception as e:
-        print(f"Error converting SVG to image: {e}")
+        
+        print(f"Error converting SVG to image: {e}", "error")
         return None
 
 def detect_pink_shapes(image_path, output_path='pink_results.png'):
     """Detect individual pink shapes using contour detection"""
+    
     print(f"Processing image: {image_path}")
     
     # Check if input is SVG and convert if needed
@@ -55,7 +60,7 @@ def detect_pink_shapes(image_path, output_path='pink_results.png'):
         img = cv2.imread(str(image_path))
     
     if img is None:
-        print(f"Error: Could not read image {image_path}")
+        print(f"Error: Could not read image {image_path}", "error")
         return 0
     
     # Convert to HSV for better color detection
@@ -357,14 +362,17 @@ def process_svg_colors(input_svg, output_svg):
         with open(output_svg, 'w', encoding='utf-8') as file:
             file.write(processed_content)
         
+        
         print("SVG processing completed!")
         print("Original colors replaced with #202124 (except #ff00cd)")
         print(f"Output saved to: {output_svg}")
         
     except FileNotFoundError:
-        print(f"Error: Could not find input file {input_svg}")
+        
+        print(f"Error: Could not find input file {input_svg}", "error")
     except Exception as e:
-        print(f"Error processing SVG: {e}")
+        
+        print(f"Error processing SVG: {e}", "error")
 
 def run_step7():
     """
@@ -389,6 +397,7 @@ def run_step7():
         process_svg_colors(input_svg, output_svg)
         
         # Then detect pink shapes on the processed SVG
+        
         print(f"Detecting pink shapes in: {output_svg}")
         count = detect_pink_shapes(output_svg, output_results)
         print(f"\nFinal count: {count} pink shapes")
@@ -396,7 +405,8 @@ def run_step7():
         return True
         
     except Exception as e:
-        print(f"Error in processing: {e}")
+        
+        print(f"Error in processing: {e}", "error")
         return False
 
 def main():
@@ -411,11 +421,12 @@ def main():
     # Check if source exists
     source_path = Path(args.source)
     if not source_path.exists():
-        print(f"Error: Source not found at {source_path}")
+        print(f"Error: Source not found at {source_path}", "error")
         return
     
     # Detect pink shapes
     count = detect_pink_shapes(source_path, args.output)
+    
     print(f"\nFinal count: {count} pink shapes")
 
 if __name__ == "__main__":
@@ -438,9 +449,11 @@ if __name__ == "__main__":
         process_svg_colors(input_svg, output_svg)
         
         # Then detect pink shapes on the processed SVG
+        
         print(f"Detecting pink shapes in: {output_svg}")
         count = detect_pink_shapes(output_svg, output_results)
         print(f"\nFinal count: {count} pink shapes")
         
     except Exception as e:
-        print(f"Error in processing: {e}")
+        
+        print(f"Error in processing: {e}", "error")

@@ -1,5 +1,8 @@
 import re
 import os
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
 
 # ====== SETTING ELEMENTS COLOR LIGHTGRAY AND BLACK SLABBANDS ====== #
 
@@ -47,6 +50,7 @@ def modify_svg_stroke_and_fill(svg_text, black_stroke="#000000", white_stroke="#
         return modified_svg_text
 
     except Exception as e:
+        
         print(f"Error modifying SVG colors: {e}")
         return svg_text
 
@@ -79,12 +83,14 @@ def run_step2():
             svg_text = file.read()
         
         # Modify the colors
+        
         print("Modifying colors...")
         final_svg = modify_svg_stroke_and_fill(svg_text)
         
         # Write the final result
         with open(output_svg, "w", encoding="utf-8") as file:
             file.write(final_svg)
+        
         
         print(f"✅ Step2 completed successfully:")
         print(f"   - Input SVG: {input_svg}")

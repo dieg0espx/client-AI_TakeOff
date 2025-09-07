@@ -1,6 +1,9 @@
 import os
 import json
 import datetime
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
 from pdf2image import convert_from_path
 import pytesseract
 
@@ -22,10 +25,12 @@ def extract_text_from_pdf(pdf_path: str = None) -> str:
     
     # Check if file exists
     if not os.path.exists(pdf_path):
-        print(f"❌ PDF file not found: {pdf_path}")
+        
+        print(f"❌ PDF file not found: {pdf_path}", "error")
         return ""
     
     try:
+        
         print(f"📄 Extracting text from: {pdf_path}")
         
         # Convert PDF to images
@@ -49,7 +54,7 @@ def extract_text_from_pdf(pdf_path: str = None) -> str:
                 print("-" * 50)
                 extracted_text += f"\n--- Page {i + 1} ---\n{text}\n"
             else:
-                print(f"⚠️  Page {i + 1} appears to be empty or contains no extractable text")
+                print(f"⚠️  Page {i + 1} appears to be empty or contains no extractable text", "warning")
         
         # Print summary
         total_chars = len(extracted_text)
@@ -59,7 +64,7 @@ def extract_text_from_pdf(pdf_path: str = None) -> str:
         print(f"   - File size: {os.path.getsize(pdf_path)} bytes")
         
         if total_chars == 0:
-            print("⚠️  No text was extracted. This might be a scanned document with poor quality.")
+            print("⚠️  No text was extracted. This might be a scanned document with poor quality.", "warning")
         
         # Store the extracted text in data.json
         if extracted_text:
@@ -69,7 +74,8 @@ def extract_text_from_pdf(pdf_path: str = None) -> str:
         return extracted_text
         
     except Exception as e:
-        print(f"❌ Error extracting text from PDF: {str(e)}")
+        
+        print(f"❌ Error extracting text from PDF: {str(e)}", "error")
         return ""
 
 def store_text_in_data_json(extracted_text: str, pdf_path: str):
@@ -98,15 +104,18 @@ def store_text_in_data_json(extracted_text: str, pdf_path: str):
         with open('data.json', 'w') as file:
             json.dump(data, file, indent=4)
         
+        
         print(f"✅ Extracted text successfully stored in data.json")
         print(f"   - Text length: {len(extracted_text)} characters")
         print(f"   - PDF file: {pdf_path}")
         
     except Exception as e:
-        print(f"❌ Error storing text in data.json: {str(e)}")
+        
+        print(f"❌ Error storing text in data.json: {str(e)}", "error")
 
 def main():
     """Main function to run text extraction"""
+    
     print("🔍 PDF Text Extractor (OCR)")
     print("=" * 50)
     
@@ -116,7 +125,7 @@ def main():
     if text:
         print("\n✅ OCR text extraction completed successfully!")
     else:
-        print("\n❌ OCR text extraction failed or no text found.")
+        print("\n❌ OCR text extraction failed or no text found.", "error")
 
 if __name__ == "__main__":
     main()

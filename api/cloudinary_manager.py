@@ -1,8 +1,14 @@
 import os
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
 import cloudinary
 import cloudinary.uploader
 from pathlib import Path
 from typing import Dict, Optional
+import cairosvg
+import io
+from PIL import Image
 
 class CloudinaryManager:
     def __init__(self):
@@ -23,6 +29,7 @@ class CloudinaryManager:
         )
         
         self.folder = "final_AI_TakeOff"
+        
         print(f"✅ Cloudinary configured successfully for folder: {self.folder}")
     
     def upload_image(self, file_path: str, public_id: str) -> Optional[str]:
@@ -38,11 +45,13 @@ class CloudinaryManager:
         """
         try:
             if not os.path.exists(file_path):
-                print(f"❌ File not found: {file_path}")
+                
+                print(f"❌ File not found: {file_path}", "error")
                 return None
             
             # Create the full public ID with folder
             full_public_id = f"{self.folder}/{public_id}"
+            
             
             print(f"📤 Uploading {file_path} to Cloudinary as {full_public_id}...")
             
@@ -59,13 +68,80 @@ class CloudinaryManager:
                 print(f"✅ Successfully uploaded to: {url}")
                 return url
             else:
-                print(f"❌ Upload failed - no URL returned")
+                print(f"❌ Upload failed - no URL returned", "error")
                 return None
                 
         except Exception as e:
-            print(f"❌ Error uploading {file_path} to Cloudinary: {str(e)}")
+            
+            print(f"❌ Error uploading {file_path} to Cloudinary: {str(e)}", "error")
             return None
     
+    def svg_to_png(self, svg_path: str, png_path: str) -> bool:
+        """
+        Convert SVG to PNG format
+        
+        Args:
+            svg_path: Path to the SVG file
+            png_path: Path where the PNG should be saved
+            
+        Returns:
+            True if conversion successful, False otherwise
+        """
+        try:
+            if not os.path.exists(svg_path):
+                print(f"❌ SVG file not found: {svg_path}")
+                return False
+            
+            # Convert SVG to PNG bytes
+            png_data = cairosvg.svg2png(url=svg_path)
+            
+            # Convert to PIL Image
+            image = Image.open(io.BytesIO(png_data))
+            
+            # Save as PNG
+            image.save(png_path, 'PNG')
+            
+            print(f"✅ SVG converted to PNG: {png_path}")
+            return True
+            
+        except Exception as e:
+            print(f"❌ Error converting SVG to PNG: {e}")
+            return False
+
+    def upload_original_svg_as_png(self) -> Optional[str]:
+        """
+        Convert original.svg to PNG and upload to Cloudinary
+        
+        Returns:
+            URL of the uploaded original.png or None if upload failed
+        """
+        try:
+            files_dir = Path("files")
+            svg_path = files_dir / "original.svg"
+            png_path = files_dir / "original.png"
+            
+            if not svg_path.exists():
+                print(f"❌ Original SVG file not found: {svg_path}")
+                return None
+            
+            # Convert SVG to PNG
+            if not self.svg_to_png(str(svg_path), str(png_path)):
+                return None
+            
+            # Upload PNG to Cloudinary
+            url = self.upload_image(str(png_path), "original")
+            
+            # Clean up temporary PNG file
+            if png_path.exists():
+                png_path.unlink()
+                print(f"🗑️  Cleaned up temporary PNG file: {png_path}")
+            
+            return url
+            
+        except Exception as e:
+            print(f"❌ Error uploading original SVG as PNG: {e}")
+            return None
+
     def upload_processing_results(self, step_results: Dict[str, int]) -> Dict[str, str]:
         """
         Upload only PNG result images to Cloudinary
@@ -96,7 +172,9 @@ class CloudinaryManager:
                 if url:
                     uploaded_urls[step_name] = url
             else:
-                print(f"⚠️  File not found: {file_path}")
+                
+                print(f"⚠️  File not found: {file_path}", "warning")
+        
         
         print(f"📊 Uploaded {len(uploaded_urls)} PNG result images to Cloudinary")
         return uploaded_urls
@@ -111,6 +189,7 @@ def get_cloudinary_manager() -> CloudinaryManager:
         try:
             cloudinary_manager = CloudinaryManager()
         except ValueError as e:
-            print(f"⚠️  Cloudinary not configured: {e}")
+            
+            print(f"⚠️  Cloudinary not configured: {e}", "warning")
             return None
     return cloudinary_manager

@@ -1,6 +1,8 @@
 import re
 import os
 import json
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 def find_and_remove_duplicate_paths(svg_path, output_path):
     try:

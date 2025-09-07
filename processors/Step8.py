@@ -14,6 +14,9 @@ import argparse
 import cairosvg
 import io
 from PIL import Image
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
 
 def svg_to_image(svg_path, output_path=None):
     """Convert SVG to PIL Image"""
@@ -27,15 +30,18 @@ def svg_to_image(svg_path, output_path=None):
         if output_path:
             # Save as PNG if output path is provided
             image.save(output_path, 'PNG')
+            
             print(f"SVG converted and saved as: {output_path}")
         
         return image
     except Exception as e:
-        print(f"Error converting SVG to image: {e}")
+        
+        print(f"Error converting SVG to image: {e}", "error")
         return None
 
 def detect_green_rectangles(image_path, output_path='results.png'):
     """Detect individual green rectangles using contour detection"""
+    
     print(f"Processing image: {image_path}")
     
     # Check if input is SVG and convert if needed
@@ -52,7 +58,7 @@ def detect_green_rectangles(image_path, output_path='results.png'):
         img = cv2.imread(str(image_path))
     
     if img is None:
-        print(f"Error: Could not read image {image_path}")
+        print(f"Error: Could not read image {image_path}", "error")
         return 0
     
     # Convert to HSV for better color detection
@@ -403,6 +409,7 @@ def process_svg_colors():
     with open(output_svg, 'w', encoding='utf-8') as file:
         file.write(processed_content)
     
+    
     print("SVG processing completed!")
     print("Original colors replaced with #202124 (except #70ff00)")
     print("#70ff00 stroke elements converted to filled shapes")
@@ -432,6 +439,7 @@ def run_step8():
         process_svg_colors()
         
         # Then detect green rectangles on the processed SVG
+        
         print(f"Detecting green rectangles in: {output_svg}")
         count = detect_green_rectangles(output_svg, output_results)
         print(f"\nFinal count: {count} green rectangles")
@@ -439,7 +447,8 @@ def run_step8():
         return True
         
     except Exception as e:
-        print(f"Error in processing: {e}")
+        
+        print(f"Error in processing: {e}", "error")
         return False
 
 def main():
@@ -454,11 +463,12 @@ def main():
     # Check if source exists
     source_path = Path(args.source)
     if not source_path.exists():
-        print(f"Error: Source not found at {source_path}")
+        print(f"Error: Source not found at {source_path}", "error")
         return
     
     # Detect rectangles
     count = detect_green_rectangles(source_path, args.output)
+    
     print(f"\nFinal count: {count} green rectangles")
 
 if __name__ == "__main__":
@@ -481,9 +491,11 @@ if __name__ == "__main__":
         process_svg_colors()
         
         # Then detect green rectangles on the processed SVG
+        
         print(f"Detecting green rectangles in: {output_svg}")
         count = detect_green_rectangles(output_svg, output_results)
         print(f"\nFinal count: {count} green rectangles")
         
     except Exception as e:
-        print(f"Error in processing: {e}")
+        
+        print(f"Error in processing: {e}", "error")

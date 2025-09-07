@@ -13,6 +13,9 @@ import argparse
 import cairosvg
 import io
 from PIL import Image
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
 
 # Shores pattern for detecting specific path elements
 shores = re.compile(
@@ -35,19 +38,23 @@ def svg_to_image(svg_path, output_path=None):
         if output_path:
             # Save as PNG if output path is provided
             image.save(output_path, 'PNG')
+            
             print(f"SVG converted and saved as: {output_path}")
         
         return image
     except Exception as e:
-        print(f"Error converting SVG to image: {e}")
+        
+        print(f"Error converting SVG to image: {e}", "error")
         return None
 
 def detect_red_squares(image_path, output_path='results.png'):
     """Detect individual red squares with color #fb0505 using contour detection"""
+    
     print(f"Processing image: {image_path}")
     
     # Check if input is SVG and convert if needed
     if str(image_path).lower().endswith('.svg'):
+        
         print("Converting SVG to image for processing...")
         pil_image = svg_to_image(str(image_path))
         if pil_image is None:
@@ -60,7 +67,8 @@ def detect_red_squares(image_path, output_path='results.png'):
         img = cv2.imread(str(image_path))
     
     if img is None:
-        print(f"Error: Could not read image {image_path}")
+        
+        print(f"Error: Could not read image {image_path}", "error")
         return 0
     
     print(f"Image loaded successfully: {img.shape}")
@@ -283,6 +291,7 @@ def process_svg_colors():
         output_results = "files/Step6-results.png"
     
     # PHASE 1: Color processing from Step4.svg to Step6.svg
+    
     print("PHASE 1: Processing colors from Step4.svg to Step6.svg")
     
     # Read the SVG file
@@ -410,8 +419,8 @@ def process_svg_colors():
         print(f"Phase 3 completed: Detected {count} red squares")
         print(f"Results saved to: {output_results}")
     except Exception as e:
-        print(f"Phase 3 error: {e}")
-        print("Note: Make sure cairosvg is installed: pip install cairosvg")
+        print(f"Phase 3 error: {e}", "error")
+        print("Note: Make sure cairosvg is installed: pip install cairosvg", "warning")
 
 def run_step6():
     """
@@ -438,7 +447,8 @@ def run_step6():
         return True
         
     except Exception as e:
-        print(f"Error in processing: {e}")
+        
+        print(f"Error in processing: {e}", "error")
         return False
 
 def main():
@@ -456,7 +466,8 @@ def main():
         # Only run contour detection
         source_path = Path(args.source)
         if not source_path.exists():
-            print(f"Error: Source not found at {source_path}")
+            
+            print(f"Error: Source not found at {source_path}", "error")
             return
         
         count = detect_red_squares(source_path, args.output)

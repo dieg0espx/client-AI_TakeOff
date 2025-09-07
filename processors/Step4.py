@@ -1,6 +1,9 @@
 import re
 import os
 import json
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
 from colorama import init, Fore, Style
 from PatternComponents import shores_box, frames_6x4, frames_5x4, frames_inBox, shores
 import cairosvg
@@ -22,6 +25,7 @@ def print_table(box_count, shores_count, frames6x4_count, frames5x4_count, frame
     
     # Table dimensions
     width = 45
+    
     print(f"\n{Fore.CYAN}{'='*width}")
     print(f"{' DETECTED ELEMENTS ':=^{width}}")
     print(f"{'='*width}{Style.RESET_ALL}")
@@ -67,7 +71,8 @@ def apply_color_to_specific_paths(input_file, output_file, red="#fb0505", blue="
     """
     try:
         if not os.path.exists(input_file):
-            print(f"{input_file} not found.")
+            
+            print(f"{input_file} not found.", "error")
             return
 
         with open(input_file, "r", encoding="utf-8") as file:
@@ -216,7 +221,9 @@ def apply_color_to_specific_paths(input_file, output_file, red="#fb0505", blue="
                     path_id_num = extract_path_id_number(path_id)
                     if path_id_num is not None:
                         diagonal_path_ids.add(path_id_num)
+                        
                         print(f"[DIAG] Found diagonal path: {path_id} (ID number: {path_id_num})")
+            
             
             print(f"Found {len(diagonal_path_ids)} diagonal paths with numeric IDs")
             
@@ -260,6 +267,7 @@ def apply_color_to_specific_paths(input_file, output_file, red="#fb0505", blue="
                     d_match = re.search(r'd="([^"]+)"', path_tag)
                     d_str = d_match.group(1) if d_match else "unknown"
                     
+                    
                     print(f"[FOUND] Path {path_id} (ID: {path_id_num}) contains length {length} in d='{d_str}'")
                     print(f"[ADJACENT] Distance {min_distance} from diagonal path ID {closest_diagonal}")
                     
@@ -294,10 +302,12 @@ def apply_color_to_specific_paths(input_file, output_file, red="#fb0505", blue="
         with open(output_file, "w", encoding="utf-8") as file:
             file.write(modified_svg_text)
 
+        
         print("SVG file updated successfully.")
 
     except Exception as e:
-        print(f"Error applying colors: {e}")
+        
+        print(f"Error applying colors: {e}", "error")
 
 def svg_to_png(svg_path, png_path):
     """Convert SVG to PNG format"""
@@ -310,11 +320,13 @@ def svg_to_png(svg_path, png_path):
         
         # Save as PNG
         image.save(png_path, 'PNG')
+        
         print(f"✅ SVG converted to PNG: {png_path}")
         return True
         
     except Exception as e:
-        print(f"❌ Error converting SVG to PNG: {e}")
+        
+        print(f"❌ Error converting SVG to PNG: {e}", "error")
         return False
 
 def run_step4():
@@ -336,9 +348,10 @@ def run_step4():
         
         # Check if input file exists
         if not os.path.exists(input_svg):
-            print(f"Error: Input file '{input_svg}' not found!")
-            print(f"Current working directory: {os.getcwd()}")
-            print(f"Tried path: {input_svg}")
+            
+            print(f"Error: Input file '{input_svg}' not found!", "error")
+            print(f"Current working directory: {os.getcwd()}", "error")
+            print(f"Tried path: {input_svg}", "error")
             return False
         
         apply_color_to_specific_paths(input_svg, output_svg)
@@ -346,9 +359,11 @@ def run_step4():
         # Convert SVG to PNG
         output_png = output_svg.replace('.svg', '-results.png')
         if svg_to_png(output_svg, output_png):
+            
             print(f"   - Generated PNG: {output_png}")
         else:
-            print(f"   - Warning: PNG conversion failed")
+            print(f"   - Warning: PNG conversion failed", "warning")
+        
         
         print(f"✅ Step4 completed successfully:")
         print(f"   - Input SVG: {input_svg}")
@@ -357,7 +372,8 @@ def run_step4():
         return True
             
     except Exception as e:
-        print(f"An error occurred: {str(e)}")
+        
+        print(f"An error occurred: {str(e)}", "error")
         return False
 
 # Main execution

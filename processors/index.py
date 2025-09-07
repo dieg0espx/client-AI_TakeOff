@@ -3,6 +3,7 @@ import sys
 import importlib.util
 import json
 from pathlib import Path
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 def run_step(step_name, capture_output=False):
     """
@@ -127,7 +128,7 @@ def extract_count_from_output(step_name, output):
 
 
 
-def update_data_json(step_counts):
+def update_data_json(step_counts, upload_id=None):
     """
     Update data.json with the collected step counts and Cloudinary URLs
     """
@@ -139,6 +140,10 @@ def update_data_json(step_counts):
                 data = json.load(f)
         else:
             data = {}
+        
+        # Add upload_id if provided
+        if upload_id:
+            data["upload_id"] = upload_id
         
         # Add step results section
         data["step_results"] = step_counts
@@ -155,11 +160,27 @@ def update_data_json(step_counts):
             
             if cloudinary_manager:
                 print("☁️  Uploading processing results to Cloudinary...")
+                
+                # Upload original.svg as original.png first
+                print("📤 Uploading original.svg as original.png...")
+                original_url = cloudinary_manager.upload_original_svg_as_png()
+                
+                # Upload processing result images
                 cloudinary_urls = cloudinary_manager.upload_processing_results(step_counts)
                 
+                # Combine all URLs
+                all_urls = {}
+                if original_url:
+                    all_urls["original"] = original_url
+                    print(f"✅ Original SVG uploaded as PNG: {original_url}")
+                
                 if cloudinary_urls:
-                    data["cloudinary_urls"] = cloudinary_urls
-                    print(f"✅ Successfully uploaded {len(cloudinary_urls)} images to Cloudinary")
+                    all_urls.update(cloudinary_urls)
+                    print(f"✅ Successfully uploaded {len(cloudinary_urls)} processing result images to Cloudinary")
+                
+                if all_urls:
+                    data["cloudinary_urls"] = all_urls
+                    print(f"✅ Total images uploaded to Cloudinary: {len(all_urls)}")
                 else:
                     print("⚠️  No images were uploaded to Cloudinary")
             else:
@@ -202,7 +223,7 @@ def check_prerequisites():
     print("✅ All required files found")
     return True
 
-def main():
+def main(upload_id=None):
     """
     Main orchestrator function that runs all processing steps
     """
@@ -263,7 +284,7 @@ def main():
         
         # Update data.json with the collected counts
         if step_counts:
-            if update_data_json(step_counts):
+            if update_data_json(step_counts, upload_id):
                 print("✅ Step counts successfully stored in data.json")
             else:
                 print("⚠️  Failed to store step counts in data.json")

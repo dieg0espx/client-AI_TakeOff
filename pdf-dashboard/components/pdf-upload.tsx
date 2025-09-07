@@ -151,7 +151,7 @@ export function PdfUpload({ onFileUpload }: PdfUploadProps) {
       console.log("✅ File uploaded successfully! Now calling the server...")
 
       // Step 4: Call the AI processing server
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5000'
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://server-aitakeoff-production.up.railway.app'
       console.log(`🌐 Calling server at: ${apiUrl}/AI-Takeoff/${uploadResult.id}`)
       
       const serverResponse = await axios.get(
