@@ -6,6 +6,7 @@
         "step8_green_rectangles": 139
     },
     "cloudinary_urls": {
+        "original": "https://res.cloudinary.com/dvord9edi/image/upload/v1757231764/final_AI_TakeOff/final_AI_TakeOff/original.png",
         "step4_results": "https://res.cloudinary.com/dvord9edi/image/upload/v1756196486/final_AI_TakeOff/final_AI_TakeOff/step4_results.png",
         "step5_results": "https://res.cloudinary.com/dvord9edi/image/upload/v1756196487/final_AI_TakeOff/final_AI_TakeOff/step5_results.png",
         "step6_results": "https://res.cloudinary.com/dvord9edi/image/upload/v1756196488/final_AI_TakeOff/final_AI_TakeOff/step6_results.png",

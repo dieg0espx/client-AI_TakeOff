@@ -156,11 +156,27 @@ def update_data_json(step_counts):
             
             if cloudinary_manager:
                 print("☁️  Uploading processing results to Cloudinary...")
+                
+                # Upload original.svg as original.png first
+                print("📤 Uploading original.svg as original.png...")
+                original_url = cloudinary_manager.upload_original_svg_as_png()
+                
+                # Upload processing result images
                 cloudinary_urls = cloudinary_manager.upload_processing_results(step_counts)
                 
+                # Combine all URLs
+                all_urls = {}
+                if original_url:
+                    all_urls["original"] = original_url
+                    print(f"✅ Original SVG uploaded as PNG: {original_url}")
+                
                 if cloudinary_urls:
-                    data["cloudinary_urls"] = cloudinary_urls
-                    print(f"✅ Successfully uploaded {len(cloudinary_urls)} images to Cloudinary")
+                    all_urls.update(cloudinary_urls)
+                    print(f"✅ Successfully uploaded {len(cloudinary_urls)} processing result images to Cloudinary")
+                
+                if all_urls:
+                    data["cloudinary_urls"] = all_urls
+                    print(f"✅ Total images uploaded to Cloudinary: {len(all_urls)}")
                 else:
                     print("⚠️  No images were uploaded to Cloudinary")
             else:
