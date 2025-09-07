@@ -40,6 +40,7 @@ try {
                 green_rectangles, 
                 status, 
                 created_at,
+                original_url,
                 step4_results_url,
                 step5_results_url,
                 step6_results_url,

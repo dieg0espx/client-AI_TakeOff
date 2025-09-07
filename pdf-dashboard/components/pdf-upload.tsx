@@ -10,15 +10,16 @@ import { cn } from "@/lib/utils"
 import { useAuth } from "@/context/AuthContext"
 import { GoogleLoginButton } from "@/components/google-login-button"
 import { CompanyJobsiteSelector } from "@/components/company-jobsite-selector"
-import { ConsoleLogs } from "@/components/console-logs"
+import { useApiClient } from "@/lib/api-client"
 import axios from "axios"
 
 interface PdfUploadProps {
-  onFileUpload: (file: File, uploadResponse: { id: string; status: string; message: string }) => void
+  onFileUpload: (file: File, uploadResponse: { id: string; status: string; message: string; company?: string; jobsite?: string }) => void
 }
 
 export function PdfUpload({ onFileUpload }: PdfUploadProps) {
   const { accessToken, setAccessToken, isAuthenticated } = useAuth()
+  const apiClient = useApiClient()
   const [isDragOver, setIsDragOver] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -26,6 +27,8 @@ export function PdfUpload({ onFileUpload }: PdfUploadProps) {
   const [fileUrl, setFileUrl] = useState<string | null>(null)
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null)
   const [selectedJobsite, setSelectedJobsite] = useState<string | null>(null)
+  const [selectionConfirmed, setSelectionConfirmed] = useState(false)
+  const [isProcessing, setIsProcessing] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const validateFile = (file: File): boolean => {
@@ -96,17 +99,14 @@ export function PdfUpload({ onFileUpload }: PdfUploadProps) {
     }
 
     setUploading(true)
+    setIsProcessing(true)
     setError(null)
 
     try {
       // Step 1: Find or Create "AI-TakeOff" folder
       let folderId
-      const folderSearchResponse = await fetch(
-        `https://www.googleapis.com/drive/v3/files?q=name='AI-TakeOff' and mimeType='application/vnd.google-apps.folder'&spaces=drive`,
-        {
-          method: "GET",
-          headers: { Authorization: `Bearer ${accessToken}` },
-        }
+      const folderSearchResponse = await apiClient.get(
+        `https://www.googleapis.com/drive/v3/files?q=name='AI-TakeOff' and mimeType='application/vnd.google-apps.folder'&spaces=drive`
       )
 
       const folderSearchResult = await folderSearchResponse.json()
@@ -115,16 +115,9 @@ export function PdfUpload({ onFileUpload }: PdfUploadProps) {
         console.log("📂 Found AI-TakeOff folder:", folderId)
       } else {
         // Folder doesn't exist, create it
-        const folderCreateResponse = await fetch("https://www.googleapis.com/drive/v3/files", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            name: "AI-TakeOff",
-            mimeType: "application/vnd.google-apps.folder",
-          }),
+        const folderCreateResponse = await apiClient.post("https://www.googleapis.com/drive/v3/files", {
+          name: "AI-TakeOff",
+          mimeType: "application/vnd.google-apps.folder",
         })
 
         const folderCreateResult = await folderCreateResponse.json()
@@ -138,11 +131,10 @@ export function PdfUpload({ onFileUpload }: PdfUploadProps) {
       form.append("metadata", new Blob([JSON.stringify(metadata)], { type: "application/json" }))
       form.append("file", selectedFile)
 
-      const uploadResponse = await fetch(
+      const uploadResponse = await apiClient.request(
         "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
         {
           method: "POST",
-          headers: { Authorization: `Bearer ${accessToken}` },
           body: form,
         }
       )
@@ -151,13 +143,9 @@ export function PdfUpload({ onFileUpload }: PdfUploadProps) {
       console.log("✅ File Uploaded:", uploadResult)
 
       // Step 3: Make file public
-      await fetch(`https://www.googleapis.com/drive/v3/files/${uploadResult.id}/permissions`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ role: "reader", type: "anyone" }),
+      await apiClient.post(`https://www.googleapis.com/drive/v3/files/${uploadResult.id}/permissions`, {
+        role: "reader",
+        type: "anyone"
       })
 
       console.log("✅ File uploaded successfully! Now calling the server...")
@@ -174,8 +162,12 @@ export function PdfUpload({ onFileUpload }: PdfUploadProps) {
       if (serverResponse.data.file_name !== '') {
         console.log('GOT SERVER RESPONSE')
         console.log(serverResponse.data)
-        // Call the original onFileUpload callback with the complete server response
-        onFileUpload(selectedFile, serverResponse.data)
+        // Call the original onFileUpload callback with the complete server response including company and jobsite
+        onFileUpload(selectedFile, {
+          ...serverResponse.data,
+          company: selectedCompany,
+          jobsite: selectedJobsite
+        })
       } else {
         setError(serverResponse.data.error || "Processing failed")
       }
@@ -184,6 +176,7 @@ export function PdfUpload({ onFileUpload }: PdfUploadProps) {
       setError("Upload failed. Please try again.")
     } finally {
       setUploading(false)
+      setIsProcessing(false)
     }
   }
 
@@ -219,6 +212,10 @@ export function PdfUpload({ onFileUpload }: PdfUploadProps) {
     console.log('Selected Jobsite:', jobsite)
   }
 
+  const handleSelectionConfirmed = () => {
+    setSelectionConfirmed(true)
+  }
+
   if (!isAuthenticated) {
     return (
       <Card className="border-dashed border-2 border-muted-foreground/25 bg-card/50">
@@ -234,6 +231,75 @@ export function PdfUpload({ onFileUpload }: PdfUploadProps) {
           </div>
         </CardContent>
       </Card>
+    )
+  }
+
+  // V0-style loading page
+  if (isProcessing) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <Card className="w-full max-w-2xl border-0 shadow-2xl bg-gradient-to-br from-background to-muted/20">
+          <CardContent className="p-12">
+            <div className="text-center space-y-8">
+              {/* Animated Logo/Icon */}
+              <div className="relative mx-auto w-20 h-20">
+                <div className="absolute inset-0 rounded-full bg-gradient-to-r from-primary/20 to-primary/40 animate-pulse"></div>
+                <div className="absolute inset-2 rounded-full bg-gradient-to-r from-primary to-primary/80 flex items-center justify-center">
+                  <svg className="w-8 h-8 text-white animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+              </div>
+
+              {/* Main Title */}
+              <div className="space-y-2">
+                <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+                  Building Your Analysis
+                </h1>
+                <p className="text-lg text-muted-foreground">
+                  Processing your PDF with AI-powered analysis
+                </p>
+              </div>
+
+              {/* Progress Steps */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-center space-x-4">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                    <span className="text-sm font-medium text-green-600">Upload Complete</span>
+                  </div>
+                  <div className="w-8 h-0.5 bg-primary/30"></div>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-3 h-3 bg-primary rounded-full animate-pulse"></div>
+                    <span className="text-sm font-medium text-primary">Processing</span>
+                  </div>
+                  <div className="w-8 h-0.5 bg-muted-foreground/20"></div>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-3 h-3 bg-muted-foreground/30 rounded-full"></div>
+                    <span className="text-sm text-muted-foreground">Analysis</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Animated Progress Bar */}
+              <div className="w-full max-w-md mx-auto">
+                <div className="h-2 bg-muted-foreground/20 rounded-full overflow-hidden">
+                  <div className="h-full bg-gradient-to-r from-primary to-primary/70 rounded-full animate-pulse" style={{ width: '60%' }}></div>
+                </div>
+                <p className="text-sm text-muted-foreground mt-2">This may take a few moments...</p>
+              </div>
+
+              {/* Floating Elements */}
+              <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                <div className="absolute top-1/4 left-1/4 w-2 h-2 bg-primary/20 rounded-full animate-ping"></div>
+                <div className="absolute top-1/3 right-1/3 w-1 h-1 bg-primary/30 rounded-full animate-ping" style={{ animationDelay: '1s' }}></div>
+                <div className="absolute bottom-1/4 left-1/3 w-1.5 h-1.5 bg-primary/25 rounded-full animate-ping" style={{ animationDelay: '2s' }}></div>
+                <div className="absolute bottom-1/3 right-1/4 w-1 h-1 bg-primary/20 rounded-full animate-ping" style={{ animationDelay: '3s' }}></div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     )
   }
 
@@ -317,12 +383,14 @@ export function PdfUpload({ onFileUpload }: PdfUploadProps) {
               >
                 {/* File Preview */}
                 {fileUrl && (
-                  <div className="w-full h-96 overflow-auto rounded-lg border">
-                    <embed 
-                      src={`${fileUrl}#toolbar=0&navpanes=0&scrollbar=0`}
-                      type="application/pdf" 
-                      className="w-full h-full" 
-                    />
+                  <div className="w-full overflow-auto rounded-lg border">
+                    <div className="aspect-[11/7.4] w-full">
+                      <embed 
+                        src={`${fileUrl}#toolbar=0&navpanes=0&scrollbar=0`}
+                        type="application/pdf" 
+                        className="w-full h-full" 
+                      />
+                    </div>
                   </div>
                 )}
 
@@ -348,10 +416,9 @@ export function PdfUpload({ onFileUpload }: PdfUploadProps) {
                 <CompanyJobsiteSelector 
                   onCompanySelect={handleCompanySelect}
                   onJobsiteSelect={handleJobsiteSelect}
+                  onSelectionConfirmed={handleSelectionConfirmed}
                 />
 
-                {/* Console Logs */}
-                <ConsoleLogs />
 
                 {/* Upload Button */}
                 <div className="flex items-center justify-between">
@@ -359,16 +426,44 @@ export function PdfUpload({ onFileUpload }: PdfUploadProps) {
                     <LogOut className="h-4 w-4" />
                     Sign Out
                   </Button>
-                  <Button onClick={uploadFileToDrive} disabled={uploading}>
-                    {uploading ? (
-                      <div className="flex items-center gap-2">
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        Uploading...
-                      </div>
-                    ) : (
-                      "Upload & Process"
-                    )}
-                  </Button>
+                  {selectionConfirmed ? (
+                    <Button 
+                      onClick={uploadFileToDrive} 
+                      disabled={uploading}
+                      className="relative overflow-hidden bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white font-semibold px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 disabled:transform-none disabled:opacity-70"
+                    >
+                      {uploading ? (
+                        <div className="flex items-center gap-3">
+                          <div className="relative">
+                            <div className="animate-spin rounded-full h-5 w-5 border-2 border-white/30"></div>
+                            <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent absolute top-0 left-0"></div>
+                          </div>
+                          <span className="font-medium">Processing...</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold">Continue</span>
+                          <svg 
+                            className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-1" 
+                            fill="none" 
+                            stroke="currentColor" 
+                            viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                          </svg>
+                        </div>
+                      )}
+                      {/* Shine effect */}
+                      <div className="absolute inset-0 -top-1 -left-1 bg-gradient-to-r from-transparent via-white/20 to-transparent transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                    </Button>
+                  ) : (
+                    <div className="flex items-center gap-3 px-6 py-3 bg-muted/30 border border-muted-foreground/20 rounded-xl">
+                      <div className="w-2 h-2 bg-muted-foreground/40 rounded-full animate-pulse"></div>
+                      <span className="text-sm text-muted-foreground font-medium">
+                        Complete project selection to continue
+                      </span>
+                    </div>
+                  )}
                 </div>
               </motion.div>
             )}

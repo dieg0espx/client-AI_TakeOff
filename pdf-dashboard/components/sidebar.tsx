@@ -21,7 +21,7 @@ const navigationItems = [
   },
   {
     id: "history",
-    label: "Previous Take Offs",
+    label: "History",
     icon: History,
   },
   {

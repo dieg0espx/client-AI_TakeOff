@@ -9,12 +9,15 @@ export function GoogleLoginButton() {
 
   const login = useGoogleLogin({
     onSuccess: (tokenResponse) => {
-      setAccessToken(tokenResponse.access_token)
+      setAccessToken(tokenResponse.access_token, tokenResponse.refresh_token)
     },
     onError: () => {
       console.error('Login Failed')
     },
-    scope: 'https://www.googleapis.com/auth/drive.file'
+    scope: 'https://www.googleapis.com/auth/drive.file',
+    // Request offline access to get refresh tokens
+    access_type: 'offline',
+    prompt: 'consent'
   })
 
   return (

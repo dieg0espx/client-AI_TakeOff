@@ -51,7 +51,7 @@ try {
         }
     } else {
         // Get all analysis results with limit
-        $sql = "SELECT id, file_name, file_size, blue_x_shapes, red_squares, pink_shapes, green_rectangles, status, company, jobsite, created_at FROM analysis_results ORDER BY created_at DESC LIMIT :limit";
+        $sql = "SELECT id, file_name, file_size, blue_x_shapes, red_squares, pink_shapes, green_rectangles, status, company, jobsite, created_at, original_url, step4_results_url, step5_results_url, step6_results_url, step7_results_url, step8_results_url FROM analysis_results ORDER BY created_at DESC LIMIT :limit";
         $stmt = $pdo->prepare($sql);
         $stmt->bindParam(':limit', $limit, PDO::PARAM_INT);
         $stmt->execute();

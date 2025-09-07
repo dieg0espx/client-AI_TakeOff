@@ -67,7 +67,7 @@ Make sure your AI processing server is running at `http://127.0.0.1:5000` or upd
 - **NEW: Extracted text display and AI enhancement**
 - **NEW: OpenAI-powered text rewriting and professional formatting**
 - **NEW: Automatic token refresh - no more re-authentication after 1 hour!**
-- **NEW: Previous Take Offs section - view and manage all processed documents**
+- **NEW: History section - view and manage all processed documents**
 
 ## Usage
 
@@ -92,7 +92,7 @@ Make sure your AI processing server is running at `http://127.0.0.1:5000` or upd
 - Construction and engineering-focused analysis
 - Structured output with clear sections and recommendations
 
-### Previous Take Offs Management
+### History Management
 - View all previously processed PDF documents
 - Filter and search through historical data
 - Display key metrics: detection counts, file details, processing status

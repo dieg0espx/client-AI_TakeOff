@@ -21,6 +21,7 @@ interface TakeOffData {
   green_rectangles: number
   status: string
   created_at: string
+  original_url?: string
   step4_results_url?: string
   step5_results_url?: string
   step6_results_url?: string
@@ -30,6 +31,7 @@ interface TakeOffData {
 
 interface PreviousTakeoffsProps {
   limit?: number
+  onViewTakeoff?: (takeoffData: { fileName: string; result: any; company?: string; jobsite?: string }) => void
 }
 
 interface TakeOffsResponse {
@@ -43,11 +45,12 @@ interface TakeOffsResponse {
   message?: string
 }
 
-export function PreviousTakeoffs({ limit = 20 }: PreviousTakeoffsProps) {
+export function PreviousTakeoffs({ limit = 20, onViewTakeoff }: PreviousTakeoffsProps) {
   const [takeoffs, setTakeoffs] = useState<TakeOffData[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [totalCount, setTotalCount] = useState<number>(0)
+  const [viewLoading, setViewLoading] = useState(false)
 
   useEffect(() => {
     fetchTakeoffs()
@@ -98,6 +101,65 @@ export function PreviousTakeoffs({ limit = 20 }: PreviousTakeoffsProps) {
         return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
       default:
         return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300'
+    }
+  }
+
+
+  const handleViewTakeoff = async (takeoff: TakeOffData) => {
+    if (onViewTakeoff) {
+      // Fetch detailed data and navigate to main page
+      try {
+        setViewLoading(true)
+        setError(null)
+        
+        const response = await fetch(`/api/takeoffs?id=${takeoff.id}`)
+        const data = await response.json()
+        
+        if (data.success && data.data) {
+          // Transform database data to match AnalysisResults expected format
+          const dbData = data.data
+          const transformedData = {
+            id: dbData.id,
+            status: dbData.status,
+            pdf_path: '', // Not stored in database
+            pdf_size: dbData.file_size,
+            svg_path: '', // Not stored in database
+            svg_size: 0, // Not stored in database
+            message: 'Analysis completed',
+            results: {
+              step_results: {
+                step5_blue_X_shapes: dbData.blue_x_shapes,
+                step6_red_squares: dbData.red_squares,
+                step7_pink_shapes: dbData.pink_shapes,
+                step8_green_rectangles: dbData.green_rectangles
+              },
+            cloudinary_urls: {
+              original: dbData.original_url || '',
+              step4_results: dbData.step4_results_url || '',
+              step5_results: dbData.step5_results_url || '',
+              step6_results: dbData.step6_results_url || '',
+              step7_results: dbData.step7_results_url || '',
+              step8_results: dbData.step8_results_url || ''
+            },
+              extracted_text: dbData.extracted_text || ''
+            }
+          }
+          
+          onViewTakeoff({
+            fileName: takeoff.file_name,
+            result: transformedData,
+            company: takeoff.company,
+            jobsite: takeoff.jobsite
+          })
+        } else {
+          setError(data.message || 'Failed to fetch detailed takeoff data')
+        }
+      } catch (err) {
+        setError('Network error occurred while fetching detailed takeoff data')
+        console.error('Error fetching detailed takeoff:', err)
+      } finally {
+        setViewLoading(false)
+      }
     }
   }
 
@@ -163,7 +225,7 @@ export function PreviousTakeoffs({ limit = 20 }: PreviousTakeoffsProps) {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-8">
             <FileText className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No Previous Take Offs</h3>
+            <h3 className="text-lg font-semibold mb-2">No History</h3>
             <p className="text-muted-foreground text-center">
               You haven't processed any PDFs yet. Upload your first document to get started.
             </p>
@@ -174,10 +236,10 @@ export function PreviousTakeoffs({ limit = 20 }: PreviousTakeoffsProps) {
           {takeoffs.map((takeoff) => (
             <Card key={takeoff.id} className="hover:shadow-md transition-shadow overflow-hidden">
               {/* Step 4 Results Image */}
-              {takeoff.step4_results_url && (
+              {takeoff.original_url && (
                 <div className="aspect-video w-full overflow-hidden -mt-6 ">
                   <img 
-                    src={takeoff.step4_results_url} 
+                    src={takeoff.original_url} 
                     alt={`Analysis results for ${takeoff.file_name}`}
                     className="w-full h-full object-cover hover:scale-105 transition-transform duration-200 "
                   />
@@ -255,7 +317,12 @@ export function PreviousTakeoffs({ limit = 20 }: PreviousTakeoffsProps) {
 
                   {/* Actions */}
                   <div className="flex gap-2 pt-2">
-                    <Button variant="outline" size="sm" className="flex-1 text-xs">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex-1 text-xs"
+                      onClick={() => handleViewTakeoff(takeoff)}
+                    >
                       <Eye className="h-3 w-3 mr-1" />
                       View
                     </Button>
@@ -272,6 +339,7 @@ export function PreviousTakeoffs({ limit = 20 }: PreviousTakeoffsProps) {
           ))}
         </div>
       )}
+
     </div>
   )
 }

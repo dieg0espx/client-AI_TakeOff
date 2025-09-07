@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
-import { Copy, Check, Download, Share, FileText, Image as ImageIcon, BarChart3, Eye, ZoomIn, ExternalLink, Hash, Square, Circle, RectangleHorizontal, RefreshCw, Wand2 } from "lucide-react"
+import { Copy, Check, Download, Share, FileText, Image as ImageIcon, BarChart3, Eye, ZoomIn, ExternalLink, Hash, Square, Circle, RectangleHorizontal, RefreshCw, Wand2, Database } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -16,6 +16,8 @@ interface AnalysisResultsProps {
   fileName: string
   result: any
   onReset: () => void
+  company?: string
+  jobsite?: string
 }
 
 interface StepResult {
@@ -26,6 +28,7 @@ interface StepResult {
 }
 
 interface CloudinaryUrls {
+  original: string
   step4_results: string
   step5_results: string
   step6_results: string
@@ -48,12 +51,13 @@ interface AnalysisData {
   }
 }
 
-export function AnalysisResults({ fileName, result, onReset }: AnalysisResultsProps) {
+export function AnalysisResults({ fileName, result, onReset, company, jobsite }: AnalysisResultsProps) {
   const [copied, setCopied] = useState(false)
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const [rewrittenText, setRewrittenText] = useState<string | null>(null)
   const [isRewriting, setIsRewriting] = useState(false)
-  const [showRewritten, setShowRewritten] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [isSaved, setIsSaved] = useState(false)
   const { toast } = useToast()
   const apiClient = useApiClient()
 
@@ -61,17 +65,31 @@ export function AnalysisResults({ fileName, result, onReset }: AnalysisResultsPr
   const analysisData: AnalysisData = typeof result === 'string' ? JSON.parse(result) : result
   const extractedText = analysisData.results.extracted_text
 
-  // Automatically enhance text when component loads
+  // Automatically enhance text when component loads and save automatically
   useEffect(() => {
     if (extractedText && !rewrittenText && !isRewriting) {
       handleRewriteText()
     }
   }, [extractedText])
 
+  // Automatically save when enhanced text is ready
+  useEffect(() => {
+    if (rewrittenText && !isSaved && !isSaving) {
+      saveAnalysisToDatabase()
+    }
+  }, [rewrittenText])
+
+  // Remove automatic saving - now user controls when to save
+  // useEffect(() => {
+  //   if (analysisData && analysisData.id) {
+  //     saveAnalysisToDatabase()
+  //   }
+  // }, [analysisData])
+
   const handleCopy = async () => {
     try {
-      // If we're in the text tab and have rewritten text, copy the current text being displayed
-      const textToCopy = showRewritten && rewrittenText ? rewrittenText : extractedText
+      // Always copy the enhanced text if available, otherwise fall back to extracted text
+      const textToCopy = rewrittenText || extractedText
       await navigator.clipboard.writeText(textToCopy)
       setCopied(true)
       toast({
@@ -89,8 +107,9 @@ export function AnalysisResults({ fileName, result, onReset }: AnalysisResultsPr
   }
 
   const handleDownload = () => {
-    const resultText = typeof result === 'string' ? result : JSON.stringify(result, null, 2)
-    const blob = new Blob([resultText], { type: "text/plain" })
+    // Always download the enhanced text if available, otherwise fall back to extracted text
+    const textToDownload = rewrittenText || extractedText
+    const blob = new Blob([textToDownload], { type: "text/plain" })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url
@@ -122,6 +141,64 @@ export function AnalysisResults({ fileName, result, onReset }: AnalysisResultsPr
     }
   }
 
+  const saveAnalysisToDatabase = async () => {
+    if (isSaving) return
+    
+    setIsSaving(true)
+    try {
+      const stepResults = analysisData.results.step_results
+      const cloudinaryUrls = analysisData.results.cloudinary_urls
+      
+      const formData = new FormData()
+      formData.append('id', analysisData.id)
+      formData.append('file_name', fileName)
+      formData.append('file_size', analysisData.pdf_size.toString())
+      formData.append('blue_x_shapes', stepResults.step5_blue_X_shapes.toString())
+      formData.append('red_squares', stepResults.step6_red_squares.toString())
+      formData.append('pink_shapes', stepResults.step7_pink_shapes.toString())
+      formData.append('green_rectangles', stepResults.step8_green_rectangles.toString())
+      formData.append('original_url', cloudinaryUrls.original || '')
+      formData.append('step4_results_url', cloudinaryUrls.step4_results || '')
+      formData.append('step5_results_url', cloudinaryUrls.step5_results || '')
+      formData.append('step6_results_url', cloudinaryUrls.step6_results || '')
+      formData.append('step7_results_url', cloudinaryUrls.step7_results || '')
+      formData.append('step8_results_url', cloudinaryUrls.step8_results || '')
+      formData.append('extracted_text', extractedText || '')
+      formData.append('enhanced_text', rewrittenText || '') // Include enhanced text if available
+      formData.append('status', analysisData.status)
+      formData.append('company', company || '')
+      formData.append('jobsite', jobsite || '')
+
+      const response = await fetch('https://ai-takeoff.ttfconstruction.com/create.php', {
+        method: 'POST',
+        body: formData
+      })
+
+      const result = await response.json()
+      
+      if (result.success) {
+        setIsSaved(true)
+        const enhancedTextNote = rewrittenText ? " (including AI-enhanced text)" : ""
+        toast({
+          title: "Analysis saved successfully",
+          description: `Your analysis results have been saved to the database.${enhancedTextNote}`,
+        })
+        console.log('Analysis results saved to database:', result.id)
+      } else {
+        throw new Error(result.message || 'Failed to save analysis results')
+      }
+    } catch (error) {
+      console.error('Error saving analysis to database:', error)
+      toast({
+        title: "Failed to save analysis",
+        description: error instanceof Error ? error.message : "An error occurred while saving the analysis.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   const handleRewriteText = async () => {
     if (isRewriting) return
     
@@ -139,7 +216,11 @@ export function AnalysisResults({ fileName, result, onReset }: AnalysisResultsPr
 
       const data = await response.json()
       setRewrittenText(data.rewrittenText)
-      setShowRewritten(true) // Show enhanced text by default
+      
+      // Update the database with the enhanced text if analysis is already saved
+      if (isSaved) {
+        await updateEnhancedTextInDatabase(data.rewrittenText)
+      }
       
       toast({
         title: "Text rewritten successfully",
@@ -154,6 +235,29 @@ export function AnalysisResults({ fileName, result, onReset }: AnalysisResultsPr
       })
     } finally {
       setIsRewriting(false)
+    }
+  }
+
+  const updateEnhancedTextInDatabase = async (enhancedText: string) => {
+    try {
+      const formData = new FormData()
+      formData.append('id', analysisData.id)
+      formData.append('enhanced_text', enhancedText)
+
+      const response = await fetch('https://ai-takeoff.ttfconstruction.com/update.php', {
+        method: 'POST',
+        body: formData
+      })
+
+      const result = await response.json()
+      
+      if (result.success) {
+        console.log('Enhanced text updated in database')
+      } else {
+        console.error('Failed to update enhanced text:', result.message)
+      }
+    } catch (error) {
+      console.error('Error updating enhanced text in database:', error)
     }
   }
 
@@ -228,6 +332,12 @@ export function AnalysisResults({ fileName, result, onReset }: AnalysisResultsPr
 
   const imageSteps = [
     {
+      key: 'original',
+      title: 'Original Image',
+      url: cloudinaryUrls.original,
+      description: 'Original PDF converted to image'
+    },
+    {
       key: 'step4_results',
       title: 'Step 4 Results',
       url: cloudinaryUrls.step4_results,
@@ -286,6 +396,23 @@ export function AnalysisResults({ fileName, result, onReset }: AnalysisResultsPr
               </CardDescription>
             </div>
             <div className="flex items-center gap-2">
+              {isSaving && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <motion.div 
+                    animate={{ rotate: 360 }} 
+                    transition={{ duration: 1, repeat: Infinity }}
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                  </motion.div>
+                  Saving...
+                </div>
+              )}
+              {isSaved && (
+                <div className="flex items-center gap-2 text-sm text-green-600">
+                  <Check className="h-4 w-4" />
+                  Saved
+                </div>
+              )}
               <Button variant="outline" size="sm" onClick={handleShare}>
                 <Share className="h-4 w-4 mr-2" />
                 Share
@@ -501,7 +628,7 @@ export function AnalysisResults({ fileName, result, onReset }: AnalysisResultsPr
             <div className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
               <span>
-                {showRewritten && rewrittenText ? "AI-Enhanced Engineering Analysis" : "Extracted Text Analysis"}
+                {rewrittenText ? "AI-Enhanced Engineering Analysis" : "Extracted Text Analysis"}
               </span>
               {rewrittenText && (
                 <Badge variant="outline" className="ml-2">
@@ -517,26 +644,16 @@ export function AnalysisResults({ fileName, result, onReset }: AnalysisResultsPr
                   <div>
                     <CardTitle className="flex items-center gap-2">
                       <FileText className="h-5 w-5" />
-                      {showRewritten && rewrittenText ? "Professional Engineering Analysis" : "Document Text Extraction"}
+                      {rewrittenText ? "Professional Engineering Analysis" : "Document Text Extraction"}
                     </CardTitle>
                     <CardDescription>
-                      {showRewritten && rewrittenText 
+                      {rewrittenText 
                         ? "Comprehensive structural engineering analysis with professional formatting"
                         : "Raw text content extracted from the PDF document"
                       }
                     </CardDescription>
                   </div>
                   <div className="flex items-center gap-2">
-                    {rewrittenText && (
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => setShowRewritten(!showRewritten)}
-                        className="gap-2"
-                      >
-                        {showRewritten ? "Show Original" : "Show Enhanced"}
-                      </Button>
-                    )}
                     {!rewrittenText && (
                       <Button 
                         variant="outline" 
@@ -580,7 +697,7 @@ export function AnalysisResults({ fileName, result, onReset }: AnalysisResultsPr
                       </div>
                     ) : (
                       <div className="text-sm leading-relaxed text-foreground">
-                        {renderMarkdown(showRewritten && rewrittenText ? rewrittenText : extractedText)}
+                        {renderMarkdown(rewrittenText || extractedText)}
                       </div>
                     )}
                   </div>
@@ -589,13 +706,13 @@ export function AnalysisResults({ fileName, result, onReset }: AnalysisResultsPr
                 <Separator className="my-4" />
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <span>
-                    {showRewritten && rewrittenText 
+                    {rewrittenText 
                       ? "Engineering analysis completed on " + new Date().toLocaleDateString()
                       : "Text extracted on " + new Date().toLocaleDateString()
                     }
                   </span>
                   <span>
-                    {(showRewritten && rewrittenText ? rewrittenText : extractedText).split(" ").length} words • {(showRewritten && rewrittenText ? rewrittenText : extractedText).split("\n").length} lines
+                    {(rewrittenText || extractedText).split(" ").length} words • {(rewrittenText || extractedText).split("\n").length} lines
                   </span>
                 </div>
               </CardContent>

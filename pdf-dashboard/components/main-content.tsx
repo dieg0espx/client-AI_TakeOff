@@ -10,11 +10,14 @@ import { AuthPopup } from "@/components/auth-popup"
 
 interface MainContentProps {
   activeSection: string
+  viewingTakeoff?: { fileName: string; result: any; company?: string; jobsite?: string } | null
+  onCloseView?: () => void
+  onViewTakeoff?: (takeoffData: { fileName: string; result: any; company?: string; jobsite?: string }) => void
 }
 
 type ProcessingState = "upload" | "results"
 
-export function MainContent({ activeSection }: MainContentProps) {
+export function MainContent({ activeSection, viewingTakeoff, onCloseView, onViewTakeoff }: MainContentProps) {
   const [processingState, setProcessingState] = useState<ProcessingState>("upload")
   const [analysisResults, setAnalysisResults] = useState<{ fileName: string; result: any; company?: string; jobsite?: string } | null>(null)
   const { isAuthenticated } = useAuth()
@@ -37,6 +40,19 @@ export function MainContent({ activeSection }: MainContentProps) {
   }
 
   const renderDashboardContent = () => {
+    // If viewing a previous takeoff, show that instead
+    if (viewingTakeoff) {
+      return (
+        <AnalysisResults 
+          fileName={viewingTakeoff.fileName}
+          result={viewingTakeoff.result}
+          onReset={onCloseView || handleReset}
+          company={viewingTakeoff.company}
+          jobsite={viewingTakeoff.jobsite}
+        />
+      )
+    }
+    
     if (processingState === "results" && analysisResults) {
       return (
         <AnalysisResults 
@@ -74,22 +90,22 @@ export function MainContent({ activeSection }: MainContentProps) {
         return (
           <div className="space-y-6">
             <div>
-              <h1 className="text-3xl font-bold tracking-tight">Previous Take Offs</h1>
+              <h1 className="text-3xl font-bold tracking-tight">History</h1>
               <p className="text-muted-foreground">
                 {isAuthenticated 
                   ? "View and manage your previously processed PDF documents and their analysis results."
-                  : "Sign in to view your previous take-offs."
+                  : "Sign in to view your history."
                 }
               </p>
             </div>
 
             {isAuthenticated ? (
-              <PreviousTakeoffs limit={20} />
+              <PreviousTakeoffs limit={20} onViewTakeoff={onViewTakeoff} />
             ) : (
               <Card>
                 <CardContent className="flex flex-col items-center justify-center py-8">
                   <p className="text-muted-foreground text-center">
-                    Please sign in to view your previous take-offs.
+                    Please sign in to view your history.
                   </p>
                 </CardContent>
               </Card>
