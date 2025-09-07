@@ -1,3 +1,4 @@
+# Railway Dockerfile - AI-Takeoff Server with all dependencies
 # Use Python 3.11 slim image
 FROM python:3.11-slim
 
