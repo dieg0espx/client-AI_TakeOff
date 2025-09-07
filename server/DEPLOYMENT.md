@@ -132,14 +132,66 @@ After deployment, test the following endpoints:
 2. Check network connectivity
 3. Ensure file paths are correct
 
+## Dependency Verification
+
+### Automatic Verification
+
+The application now includes comprehensive dependency verification:
+
+1. **Build-time verification** in Dockerfile
+2. **Startup verification** in main.py
+3. **Health check endpoint** at `/health`
+4. **Comprehensive verification script** (`verify_dependencies.py`)
+
+### Manual Testing
+
+#### Local Testing
+```bash
+# Test dependencies locally
+python test_dependencies.py
+
+# Run comprehensive verification
+python verify_dependencies.py
+```
+
+#### Remote Testing
+```bash
+# Check health endpoint
+curl https://your-railway-app.railway.app/health
+
+# The response will include dependency status:
+{
+  "status": "healthy",
+  "dependencies": {
+    "opencv": {"status": "ok", "version": "4.8.0"},
+    "tesseract": {"status": "ok"},
+    "cairosvg": {"status": "ok"},
+    "cloudinary": {"status": "ok"}
+  }
+}
+```
+
 ## Monitoring
 
 Monitor the following in Railway logs:
 
-1. **Environment Setup**: Look for "Environment setup completed"
-2. **Tesseract**: Look for "Tesseract OCR is available"
-3. **Dependencies**: Check for any missing dependency warnings
-4. **Processing**: Monitor step-by-step processing logs
+1. **Docker Build**: Look for dependency verification messages
+2. **Environment Setup**: Look for "Environment setup completed"
+3. **Dependency Verification**: Look for "All dependencies verified successfully"
+4. **Tesseract**: Look for "Tesseract OCR is available"
+5. **Health Checks**: Monitor `/health` endpoint responses
+6. **Processing**: Monitor step-by-step processing logs
+
+### Build Log Monitoring
+
+Watch for these success messages in Railway build logs:
+```
+🔍 Verifying system dependencies...
+✅ System dependencies verified
+🔍 Verifying Python packages...
+✅ Python packages verified
+🎉 ALL DEPENDENCIES VERIFIED SUCCESSFULLY!
+```
 
 ## Performance Notes
 

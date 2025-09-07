@@ -22,6 +22,20 @@ try:
 except ImportError:
     print("⚠️  Environment setup script not found, continuing with default configuration")
 
+# Verify dependencies on startup
+try:
+    from verify_dependencies import main as verify_deps
+    print("🔍 Running dependency verification...")
+    deps_ok = verify_deps()
+    if not deps_ok:
+        print("⚠️  Some dependencies may not be working correctly")
+    else:
+        print("✅ All dependencies verified successfully")
+except ImportError:
+    print("⚠️  Dependency verification script not found")
+except Exception as e:
+    print(f"⚠️  Error during dependency verification: {e}")
+
 
 # Add the api directory to the Python path
 sys.path.append(os.path.join(os.path.dirname(__file__), 'api'))
@@ -149,7 +163,44 @@ async def root():
 # Health check endpoint
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "message": "Server is running properly"}
+    """Comprehensive health check including dependency status"""
+    health_status = {
+        "status": "healthy",
+        "message": "Server is running properly",
+        "timestamp": datetime.now().isoformat(),
+        "dependencies": {}
+    }
+    
+    # Check critical dependencies
+    try:
+        import cv2
+        health_status["dependencies"]["opencv"] = {"status": "ok", "version": cv2.__version__}
+    except Exception as e:
+        health_status["dependencies"]["opencv"] = {"status": "error", "error": str(e)}
+        health_status["status"] = "degraded"
+    
+    try:
+        import pytesseract
+        pytesseract.get_tesseract_version()
+        health_status["dependencies"]["tesseract"] = {"status": "ok"}
+    except Exception as e:
+        health_status["dependencies"]["tesseract"] = {"status": "error", "error": str(e)}
+        health_status["status"] = "degraded"
+    
+    try:
+        import cairosvg
+        health_status["dependencies"]["cairosvg"] = {"status": "ok"}
+    except Exception as e:
+        health_status["dependencies"]["cairosvg"] = {"status": "error", "error": str(e)}
+        health_status["status"] = "degraded"
+    
+    try:
+        import cloudinary
+        health_status["dependencies"]["cloudinary"] = {"status": "ok"}
+    except Exception as e:
+        health_status["dependencies"]["cloudinary"] = {"status": "error", "error": str(e)}
+    
+    return health_status
 
 
 # AI-Takeoff specific endpoint

@@ -70,6 +70,27 @@ COPY . .
 # Create files directory
 RUN mkdir -p files
 
+# Verify all dependencies are installed
+RUN echo "🔍 Verifying system dependencies..." && \
+    which tesseract && \
+    tesseract --version && \
+    which fontconfig && \
+    ls -la /usr/lib/x86_64-linux-gnu/libGL* && \
+    ls -la /usr/lib/x86_64-linux-gnu/libcairo* && \
+    echo "✅ System dependencies verified"
+
+# Verify Python packages
+RUN echo "🔍 Verifying Python packages..." && \
+    python -c "import cv2; print('OpenCV:', cv2.__version__)" && \
+    python -c "import cairosvg; print('CairoSVG: OK')" && \
+    python -c "import pytesseract; print('Pytesseract: OK')" && \
+    python -c "import PIL; print('Pillow: OK')" && \
+    python -c "import numpy; print('NumPy: OK')" && \
+    echo "✅ Python packages verified"
+
+# Run comprehensive dependency check
+RUN python verify_dependencies.py
+
 # Expose port
 EXPOSE 5001
 
