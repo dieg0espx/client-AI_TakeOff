@@ -20,17 +20,23 @@ nixPkgs = [
     "gdk-pixbuf",
     "gtk+3",
     "poppler",
-    "poppler_utils"
+    "poppler_utils",
+    "poppler_data"
 ]
 
 [phases.install]
 cmds = [
+    "pip install --upgrade pip",
     "pip install -r requirements.txt"
 ]
 
 [phases.build]
 cmds = [
-    "echo 'Build phase completed'"
+    "echo 'Build phase completed'",
+    "echo 'Verifying system dependencies...'",
+    "which tesseract || echo 'Tesseract not found'",
+    "which fontconfig || echo 'Fontconfig not found'",
+    "ls -la /usr/lib/x86_64-linux-gnu/libGL* || echo 'OpenGL libraries not found'"
 ]
 
 [start]
