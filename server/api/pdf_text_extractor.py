@@ -7,6 +7,19 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from pdf2image import convert_from_path
 import pytesseract
 
+# Configure tesseract path for Railway deployment
+if os.path.exists('/usr/bin/tesseract'):
+    pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
+elif os.path.exists('/nix/store'):
+    # For Nix-based systems (Railway with Nixpacks)
+    import subprocess
+    try:
+        result = subprocess.run(['which', 'tesseract'], capture_output=True, text=True)
+        if result.returncode == 0:
+            pytesseract.pytesseract.tesseract_cmd = result.stdout.strip()
+    except:
+        pass
+
 def extract_text_from_pdf(pdf_path: str = None) -> str:
     """
     Extract text from a PDF file using OCR, print it to console, and store in data.json
@@ -33,6 +46,15 @@ def extract_text_from_pdf(pdf_path: str = None) -> str:
         
         print(f"📄 Extracting text from: {pdf_path}")
         
+        # Test tesseract availability
+        try:
+            pytesseract.get_tesseract_version()
+            print("✅ Tesseract OCR is available")
+        except Exception as tesseract_error:
+            print(f"❌ Tesseract OCR not available: {tesseract_error}")
+            print("💡 Make sure tesseract is installed and in PATH")
+            return ""
+        
         # Convert PDF to images
         print("🔄 Converting PDF to images for OCR processing...")
         images = convert_from_path(pdf_path)
@@ -44,17 +66,21 @@ def extract_text_from_pdf(pdf_path: str = None) -> str:
         for i, image in enumerate(images):
             print(f"📖 Processing page {i + 1}/{len(images)} with OCR...")
             
-            # Extract text from image using pytesseract
-            text = pytesseract.image_to_string(image)
-            
-            if text.strip():
-                print(f"📄 Page {i + 1} extracted text:")
-                print("-" * 50)
-                print(text)
-                print("-" * 50)
-                extracted_text += f"\n--- Page {i + 1} ---\n{text}\n"
-            else:
-                print(f"⚠️  Page {i + 1} appears to be empty or contains no extractable text", "warning")
+            try:
+                # Extract text from image using pytesseract
+                text = pytesseract.image_to_string(image)
+                
+                if text.strip():
+                    print(f"📄 Page {i + 1} extracted text:")
+                    print("-" * 50)
+                    print(text)
+                    print("-" * 50)
+                    extracted_text += f"\n--- Page {i + 1} ---\n{text}\n"
+                else:
+                    print(f"⚠️  Page {i + 1} appears to be empty or contains no extractable text", "warning")
+            except Exception as ocr_error:
+                print(f"⚠️  OCR failed for page {i + 1}: {ocr_error}")
+                continue
         
         # Print summary
         total_chars = len(extracted_text)

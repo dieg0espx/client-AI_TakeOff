@@ -1,0 +1,37 @@
+[phases.setup]
+nixPkgs = [
+    "tesseract",
+    "tesseract-data-eng",
+    "fontconfig",
+    "libGL",
+    "mesa",
+    "xorg.libX11",
+    "xorg.libXext",
+    "xorg.libXrender",
+    "xorg.libXi",
+    "xorg.libXrandr",
+    "xorg.libXcursor",
+    "xorg.libXinerama",
+    "xorg.libXxf86vm",
+    "libglvnd",
+    "glib",
+    "cairo",
+    "pango",
+    "gdk-pixbuf",
+    "gtk+3",
+    "poppler",
+    "poppler_utils"
+]
+
+[phases.install]
+cmds = [
+    "pip install -r requirements.txt"
+]
+
+[phases.build]
+cmds = [
+    "echo 'Build phase completed'"
+]
+
+[start]
+cmd = "python main.py"

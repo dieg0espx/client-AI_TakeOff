@@ -19,10 +19,19 @@ import io
 from PIL import Image
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
+# Configure environment for headless operation
+os.environ['QT_QPA_PLATFORM'] = 'offscreen'
+os.environ['MPLBACKEND'] = 'Agg'
+os.environ['OPENCV_IO_ENABLE_OPENEXR'] = '1'
+
 
 def svg_to_image(svg_path, output_path=None):
     """Convert SVG to PIL Image"""
     try:
+        # Set fontconfig path if not already set
+        if not os.environ.get('FONTCONFIG_PATH'):
+            os.environ['FONTCONFIG_PATH'] = '/etc/fonts'
+        
         # Convert SVG to PNG bytes
         png_data = cairosvg.svg2png(url=svg_path)
         
@@ -39,6 +48,7 @@ def svg_to_image(svg_path, output_path=None):
     except Exception as e:
         
         print(f"Error converting SVG to image: {e}", "error")
+        print("💡 This might be due to missing fontconfig or cairo dependencies")
         return None
 
 def detect_blue_x_shapes(image_path, output_path='results.png'):
@@ -46,23 +56,28 @@ def detect_blue_x_shapes(image_path, output_path='results.png'):
     
     print(f"Processing image: {image_path}")
     
-    # Check if input is SVG and convert if needed
-    if str(image_path).lower().endswith('.svg'):
+    try:
+        # Check if input is SVG and convert if needed
+        if str(image_path).lower().endswith('.svg'):
+            
+            print("Converting SVG to image for processing...")
+            pil_image = svg_to_image(image_path)
+            if pil_image is None:
+                return 0
+            
+            # Convert PIL Image to OpenCV format
+            img = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
+        else:
+            # Read image directly if it's not SVG
+            img = cv2.imread(str(image_path))
         
-        print("Converting SVG to image for processing...")
-        pil_image = svg_to_image(image_path)
-        if pil_image is None:
+        if img is None:
+            
+            print(f"Error: Could not read image {image_path}", "error")
             return 0
-        
-        # Convert PIL Image to OpenCV format
-        img = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
-    else:
-        # Read image directly if it's not SVG
-        img = cv2.imread(str(image_path))
-    
-    if img is None:
-        
-        print(f"Error: Could not read image {image_path}", "error")
+    except Exception as e:
+        print(f"❌ Error in image processing setup: {e}")
+        print("💡 This might be due to missing OpenGL or OpenCV dependencies")
         return 0
     
     # Convert to HSV for better color detection

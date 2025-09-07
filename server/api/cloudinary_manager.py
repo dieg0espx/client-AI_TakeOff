@@ -10,6 +10,10 @@ import cairosvg
 import io
 from PIL import Image
 
+# Configure environment for headless operation
+os.environ['QT_QPA_PLATFORM'] = 'offscreen'
+os.environ['MPLBACKEND'] = 'Agg'
+
 class CloudinaryManager:
     def __init__(self):
         """Initialize Cloudinary configuration with hardcoded credentials"""
@@ -92,6 +96,10 @@ class CloudinaryManager:
                 print(f"❌ SVG file not found: {svg_path}")
                 return False
             
+            # Set fontconfig path if not already set
+            if not os.environ.get('FONTCONFIG_PATH'):
+                os.environ['FONTCONFIG_PATH'] = '/etc/fonts'
+            
             # Convert SVG to PNG bytes
             png_data = cairosvg.svg2png(url=svg_path)
             
@@ -106,6 +114,7 @@ class CloudinaryManager:
             
         except Exception as e:
             print(f"❌ Error converting SVG to PNG: {e}")
+            print("💡 This might be due to missing fontconfig or cairo dependencies")
             return False
 
     def upload_original_svg_as_png(self) -> Optional[str]:

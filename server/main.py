@@ -15,6 +15,13 @@ from datetime import datetime
 # Load environment variables from .env file
 load_dotenv()
 
+# Setup environment for Railway deployment
+try:
+    from setup_environment import setup_environment
+    setup_environment()
+except ImportError:
+    print("⚠️  Environment setup script not found, continuing with default configuration")
+
 
 # Add the api directory to the Python path
 sys.path.append(os.path.join(os.path.dirname(__file__), 'api'))

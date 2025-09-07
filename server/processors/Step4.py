@@ -10,6 +10,10 @@ import cairosvg
 import io
 from PIL import Image
 
+# Configure environment for headless operation
+os.environ['QT_QPA_PLATFORM'] = 'offscreen'
+os.environ['MPLBACKEND'] = 'Agg'
+
 def print_table(box_count, shores_count, frames6x4_count, frames5x4_count, framesinbox_count):
     # Initialize colorama
     init()
@@ -312,6 +316,10 @@ def apply_color_to_specific_paths(input_file, output_file, red="#fb0505", blue="
 def svg_to_png(svg_path, png_path):
     """Convert SVG to PNG format"""
     try:
+        # Set fontconfig path if not already set
+        if not os.environ.get('FONTCONFIG_PATH'):
+            os.environ['FONTCONFIG_PATH'] = '/etc/fonts'
+        
         # Convert SVG to PNG bytes
         png_data = cairosvg.svg2png(url=svg_path)
         
@@ -327,6 +335,7 @@ def svg_to_png(svg_path, png_path):
     except Exception as e:
         
         print(f"❌ Error converting SVG to PNG: {e}", "error")
+        print("💡 This might be due to missing fontconfig or cairo dependencies")
         return False
 
 def run_step4():
