@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { GoogleLoginButton } from "@/components/google-login-button"
 import { useAuth } from "@/context/AuthContext"
-import { LayoutDashboard, History, Settings, Menu, X, LogOut, Webhook } from "lucide-react"
+import { LayoutDashboard, History, Settings, Menu, X, LogOut } from "lucide-react"
 import { useState } from "react"
 
 interface SidebarProps {
@@ -16,18 +16,13 @@ interface SidebarProps {
 const navigationItems = [
   {
     id: "dashboard",
-    label: "Dashboard",
+    label: "New Take Off",
     icon: LayoutDashboard,
   },
   {
     id: "history",
-    label: "History",
+    label: "Previous Take Offs",
     icon: History,
-  },
-  {
-    id: "webhooks",
-    label: "Webhooks",
-    icon: Webhook,
   },
   {
     id: "settings",

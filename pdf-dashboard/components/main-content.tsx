@@ -3,73 +3,52 @@
 import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { PdfUpload } from "@/components/pdf-upload"
-import { LoadingStates } from "@/components/loading-states"
-import { AnalysisResults } from "@/components/analysis-results"
+import { AnalysisResults } from "./analysis-results"
+import { PreviousTakeoffs } from "./previous-takeoffs"
 import { useAuth } from "@/context/AuthContext"
-import { GoogleLoginButton } from "@/components/google-login-button"
+import { AuthPopup } from "@/components/auth-popup"
 
 interface MainContentProps {
   activeSection: string
 }
 
-type ProcessingState = "upload" | "loading" | "results"
+type ProcessingState = "upload" | "results"
 
 export function MainContent({ activeSection }: MainContentProps) {
   const [processingState, setProcessingState] = useState<ProcessingState>("upload")
-  const [currentFile, setCurrentFile] = useState<string>("")
-  const [currentUploadId, setCurrentUploadId] = useState<string>("")
-  const [analysisResult, setAnalysisResult] = useState<string>("")
-  const [serverResult, setServerResult] = useState<any>(null)
+  const [analysisResults, setAnalysisResults] = useState<{ fileName: string; result: any; company?: string; jobsite?: string } | null>(null)
   const { isAuthenticated } = useAuth()
 
-  const handleFileUpload = (file: File, uploadResponse: { id: string; status: string; message: string }) => {
-    setCurrentFile(file.name)
-    setCurrentUploadId(uploadResponse.id)
-    setServerResult(uploadResponse)
-    setProcessingState("results")
-  }
-
-  const handleLoadingComplete = (result: string) => {
-    setAnalysisResult(result)
+  const handleFileUpload = (file: File, uploadResponse: { id: string; status: string; message: string; company?: string; jobsite?: string }) => {
+    // File upload completed - navigate to results
+    console.log("File uploaded successfully:", file.name, uploadResponse)
+    setAnalysisResults({
+      fileName: file.name,
+      result: uploadResponse,
+      company: uploadResponse.company,
+      jobsite: uploadResponse.jobsite
+    })
     setProcessingState("results")
   }
 
   const handleReset = () => {
+    setAnalysisResults(null)
     setProcessingState("upload")
-    setCurrentFile("")
-    setCurrentUploadId("")
-    setAnalysisResult("")
-    setServerResult(null)
   }
 
   const renderDashboardContent = () => {
-    if (!isAuthenticated) {
+    if (processingState === "results" && analysisResults) {
       return (
-        <Card>
-          <CardHeader>
-            <CardTitle>Authentication Required</CardTitle>
-            <CardDescription>Please sign in with Google to access the PDF analysis features.</CardDescription>
-          </CardHeader>
-          <CardContent className="flex justify-center">
-            <GoogleLoginButton />
-          </CardContent>
-        </Card>
+        <AnalysisResults 
+          fileName={analysisResults.fileName}
+          result={analysisResults.result}
+          onReset={handleReset}
+          company={analysisResults.company}
+          jobsite={analysisResults.jobsite}
+        />
       )
     }
-
-    switch (processingState) {
-      case "upload":
-        return <PdfUpload onFileUpload={handleFileUpload} />
-
-      case "loading":
-        return <LoadingStates fileName={currentFile} uploadId={currentUploadId} onComplete={handleLoadingComplete} />
-
-      case "results":
-        return <AnalysisResults fileName={currentFile} result={serverResult} onReset={handleReset} />
-
-      default:
-        return <PdfUpload onFileUpload={handleFileUpload} />
-    }
+    return <PdfUpload onFileUpload={handleFileUpload} />
   }
 
   const renderContent = () => {
@@ -78,7 +57,7 @@ export function MainContent({ activeSection }: MainContentProps) {
         return (
           <div className="space-y-6">
             <div>
-              <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+              <h1 className="text-3xl font-bold tracking-tight">New Take Off</h1>
               <p className="text-muted-foreground">
                 {isAuthenticated 
                   ? "Upload and analyze your PDF documents with AI-powered insights."
@@ -95,51 +74,26 @@ export function MainContent({ activeSection }: MainContentProps) {
         return (
           <div className="space-y-6">
             <div>
-              <h1 className="text-3xl font-bold tracking-tight">History</h1>
+              <h1 className="text-3xl font-bold tracking-tight">Previous Take Offs</h1>
               <p className="text-muted-foreground">
                 {isAuthenticated 
-                  ? "View your previously analyzed PDF documents and results."
-                  : "Sign in to view your analysis history."
+                  ? "View and manage your previously processed PDF documents and their analysis results."
+                  : "Sign in to view your previous take-offs."
                 }
               </p>
             </div>
 
-            {!isAuthenticated ? (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Authentication Required</CardTitle>
-                  <CardDescription>Please sign in to view your analysis history.</CardDescription>
-                </CardHeader>
-                <CardContent className="flex justify-center">
-                  <GoogleLoginButton />
-                </CardContent>
-              </Card>
+            {isAuthenticated ? (
+              <PreviousTakeoffs limit={20} />
             ) : (
               <Card>
-                <CardHeader>
-                  <CardTitle>Analysis History</CardTitle>
-                  <CardDescription>Your recent PDF analysis sessions will appear here</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground text-center py-8">
-                    No analysis history yet. Upload a PDF to get started.
+                <CardContent className="flex flex-col items-center justify-center py-8">
+                  <p className="text-muted-foreground text-center">
+                    Please sign in to view your previous take-offs.
                   </p>
                 </CardContent>
               </Card>
             )}
-          </div>
-        )
-
-      case "webhooks":
-        return (
-          <div className="space-y-6">
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight">Webhooks</h1>
-              <p className="text-muted-foreground">
-                Monitor real-time webhook data from your server on port 1234.
-              </p>
-            </div>
-            <WebhookDisplay />
           </div>
         )
 
@@ -156,29 +110,17 @@ export function MainContent({ activeSection }: MainContentProps) {
               </p>
             </div>
 
-            {!isAuthenticated ? (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Authentication Required</CardTitle>
-                  <CardDescription>Please sign in to access settings.</CardDescription>
-                </CardHeader>
-                <CardContent className="flex justify-center">
-                  <GoogleLoginButton />
-                </CardContent>
-              </Card>
-            ) : (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Preferences</CardTitle>
-                  <CardDescription>Customize your dashboard experience</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground text-center py-8">
-                    Settings panel will be implemented with additional features.
-                  </p>
-                </CardContent>
-              </Card>
-            )}
+            <Card>
+              <CardHeader>
+                <CardTitle>Preferences</CardTitle>
+                <CardDescription>Customize your dashboard experience</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground text-center py-8">
+                  Settings panel will be implemented with additional features.
+                </p>
+              </CardContent>
+            </Card>
           </div>
         )
 
@@ -188,8 +130,11 @@ export function MainContent({ activeSection }: MainContentProps) {
   }
 
   return (
-    <main className="flex-1 overflow-auto">
-      <div className="container mx-auto p-6 md:p-8 max-w-7xl">{renderContent()}</div>
-    </main>
+    <>
+      <main className="flex-1 overflow-auto">
+        <div className="container mx-auto p-6 md:p-8 max-w-7xl">{renderContent()}</div>
+      </main>
+      <AuthPopup isOpen={!isAuthenticated} />
+    </>
   )
 }

@@ -43,6 +43,7 @@ Create a `.env.local` file in the root directory with:
 ```env
 # Google OAuth Configuration
 NEXT_PUBLIC_GOOGLE_CLIENT_ID=your-actual-client-id-here
+NEXT_PUBLIC_GOOGLE_CLIENT_SECRET=your-actual-client-secret-here
 
 # API Configuration
 NEXT_PUBLIC_API_URL=http://127.0.0.1:5000
@@ -57,7 +58,7 @@ Make sure your AI processing server is running at `http://127.0.0.1:5000` or upd
 
 ## Features
 
-- Google OAuth authentication
+- Google OAuth authentication with **automatic token refresh**
 - PDF file upload to Google Drive
 - Automatic folder creation ("AI-TakeOff")
 - File sharing for AI processing
@@ -65,6 +66,8 @@ Make sure your AI processing server is running at `http://127.0.0.1:5000` or upd
 - Real-time processing logs
 - **NEW: Extracted text display and AI enhancement**
 - **NEW: OpenAI-powered text rewriting and professional formatting**
+- **NEW: Automatic token refresh - no more re-authentication after 1 hour!**
+- **NEW: Previous Take Offs section - view and manage all processed documents**
 
 ## Usage
 
@@ -88,3 +91,12 @@ Make sure your AI processing server is running at `http://127.0.0.1:5000` or upd
 - Professional formatting and improved readability
 - Construction and engineering-focused analysis
 - Structured output with clear sections and recommendations
+
+### Previous Take Offs Management
+- View all previously processed PDF documents
+- Filter and search through historical data
+- Display key metrics: detection counts, file details, processing status
+- Company and jobsite information for each take-off
+- Quick access to view and download results
+- Responsive grid layout with detailed cards
+- Real-time data fetching from database
