@@ -8,6 +8,7 @@ import sys
 import os
 import json
 import asyncio
+import shutil
 from dotenv import load_dotenv
 from datetime import datetime
 
@@ -44,87 +45,77 @@ async def log_to_client(upload_id: str, message: str, log_type: str = "info"):
     print(message)
 
 
+# Cleanup function to clear files and reset data.json
+def cleanup_after_response():
+    """Clear the files folder and reset data.json after response is sent"""
+    try:
+        # Clear the files folder
+        files_dir = "files"
+        if os.path.exists(files_dir):
+            # Remove all files in the files directory
+            for filename in os.listdir(files_dir):
+                file_path = os.path.join(files_dir, filename)
+                try:
+                    if os.path.isfile(file_path) or os.path.islink(file_path):
+                        os.unlink(file_path)
+                    elif os.path.isdir(file_path):
+                        shutil.rmtree(file_path)
+                except Exception as e:
+                    print(f"Failed to delete {file_path}. Reason: {e}")
+            print("✅ Files folder cleared successfully")
+        else:
+            print("⚠️  Files directory does not exist")
+        
+        # Reset data.json to empty structure
+        data_json_path = "data.json"
+        empty_data = {
+            "step_results": {},
+            "cloudinary_urls": {},
+            "extracted_text": ""
+        }
+        
+        with open(data_json_path, 'w') as f:
+            json.dump(empty_data, f, indent=4)
+        
+        print("✅ data.json reset to empty structure")
+        
+    except Exception as e:
+        print(f"❌ Error during cleanup: {e}")
+
+
 
 # Modified pipeline runner with logging support
 def run_pipeline_with_logging(upload_id: str):
-    """Run the processing pipeline with logging"""
+    """Run the processing pipeline with logging using the proper pipeline from processors/index.py"""
     import sys
     import os
-    import importlib.util
-    import json
     
-    # Define the processing steps in order
-    steps = [
-        "Step1",  # Remove duplicate paths
-        "Step2",  # Modify colors (lightgray and black)
-        "Step3",  # Add background
-        "Step4",  # Apply color coding to specific patterns
-        "Step5",  # Detect blue X shapes
-        "Step6",  # Detect red squares
-        "Step7",  # Detect pink shapes
-        "Step8",  # Detect green rectangles
-    ]
+    # Add processors directory to Python path
+    processors_dir = os.path.abspath("processors")
+    if processors_dir not in sys.path:
+        sys.path.insert(0, processors_dir)
     
-    successful_steps = 0
-    total_steps = len(steps)
-    step_counts = {}
-    
-    # Run each step in sequence
-    for i, step in enumerate(steps):
-        try:
-            # Construct the path to the step file
-            step_file = f"processors/{step}.py"
-            
-            if not os.path.exists(step_file):
-                print(f"Step file {step_file} not found. Skipping...")
-                continue
-            
-            print(f"\n{'='*50}")
-            print(f"Running {step}...")
-            print(f"{'='*50}")
-            
-            # Add processors directory to Python path
-            processors_dir = os.path.abspath("processors")
-            if processors_dir not in sys.path:
-                sys.path.insert(0, processors_dir)
-            
-            # Import and run the step
-            spec = importlib.util.spec_from_file_location(step, step_file)
-            step_module = importlib.util.module_from_spec(spec)
-            sys.modules[step] = step_module
-            spec.loader.exec_module(step_module)
-            
-            run_function_name = f'run_{step.lower()}'
-            if hasattr(step_module, run_function_name):
-                run_function = getattr(step_module, run_function_name)
-                success = run_function()
-                
-                if success:
-                    successful_steps += 1
-                    print(f"✅ {step} completed successfully")
-                else:
-                    print(f"❌ {step} failed")
-                    break
-            else:
-                print(f"⚠️  No run function found for {step}")
-                break
-                
-        except Exception as e:
-            print(f"❌ Error running {step}: {str(e)}")
-            break
-    
-    # Summary
-    print(f"\n{'='*60}")
-    print(f"📊 Processing Summary")
-    print(f"{'='*60}")
-    print(f"Steps completed: {successful_steps}/{total_steps}")
-    
-    if successful_steps == total_steps:
-        print(f"🎉 All steps completed successfully!")
-    else:
-        print(f"⚠️  Pipeline completed with some failures")
-    
-    return successful_steps == total_steps
+    try:
+        # Import the main function from processors/index.py
+        from index import main as pipeline_main
+        
+        print(f"\n{'='*60}")
+        print(f"🚀 Starting AI TakeOff Processing Pipeline")
+        print(f"{'='*60}")
+        
+        # Run the proper pipeline that includes data.json population
+        success = pipeline_main(upload_id)
+        
+        if success:
+            print(f"🎉 All steps completed successfully!")
+        else:
+            print(f"⚠️  Pipeline completed with some failures")
+        
+        return success
+        
+    except Exception as e:
+        print(f"❌ Error running pipeline: {str(e)}")
+        return False
 
 # Initialize the PDF to SVG converter
 try:
@@ -148,6 +139,11 @@ app.add_middleware(
 async def root():
     return {"message": "AI-Takeoff Server is running!", "status": "running"}
 
+# Health check endpoint
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy", "message": "Server is running properly"}
+
 
 # AI-Takeoff specific endpoint
 @app.get("/AI-Takeoff/{upload_id}")
@@ -161,10 +157,16 @@ async def get_ai_takeoff_result(upload_id: str, background_tasks: BackgroundTask
     # Force synchronous processing by default, or if sync=True
     if sync:
         print(f"🔄 Running in synchronous mode...")
-        return await process_ai_takeoff_sync(upload_id)
+        result = await process_ai_takeoff_sync(upload_id)
     else:
         # Fallback to synchronous processing
-        return await process_ai_takeoff_sync(upload_id)
+        result = await process_ai_takeoff_sync(upload_id)
+    
+    # Add cleanup task to run after response is sent
+    if background_tasks:
+        background_tasks.add_task(cleanup_after_response)
+    
+    return result
 
 # Extract text from PDF endpoint
 @app.get("/extract-text/{upload_id}")
@@ -210,7 +212,7 @@ async def extract_pdf_text(upload_id: str):
 
 # Get results endpoint
 @app.get("/AI-Takeoff/{upload_id}/results")
-async def get_ai_takeoff_results(upload_id: str):
+async def get_ai_takeoff_results(upload_id: str, background_tasks: BackgroundTasks = None):
     """Get the results from data.json for a specific upload_id"""
     data_json_path = os.path.join('data.json')
     
@@ -228,11 +230,17 @@ async def get_ai_takeoff_results(upload_id: str):
         
         # Check if this result belongs to the requested upload_id
         if data_results.get('upload_id') == upload_id:
-            return {
+            result = {
                 "id": upload_id,
                 "status": "completed",
                 "results": data_results
             }
+            
+            # Add cleanup task to run after response is sent
+            if background_tasks:
+                background_tasks.add_task(cleanup_after_response)
+            
+            return result
         else:
             return {
                 "id": upload_id,
@@ -257,6 +265,14 @@ async def process_ai_takeoff_sync(upload_id: str):
         # Step 1: Download the PDF
         file_path = download_pdf_from_drive(upload_id)
         await log_to_client(upload_id, f"📄 PDF downloaded successfully to: {file_path}")
+        
+        # Step 1.5: Extract text from PDF
+        await log_to_client(upload_id, f"📖 Extracting text from PDF...")
+        try:
+            extracted_text = extract_text_from_pdf(file_path)
+            await log_to_client(upload_id, f"✅ Text extraction completed, {len(extracted_text)} characters extracted")
+        except Exception as text_error:
+            await log_to_client(upload_id, f"⚠️  Text extraction failed: {text_error}", "warning")
         
         # Step 2: Convert PDF to SVG
         svg_path = None
@@ -360,4 +376,8 @@ async def process_ai_takeoff_sync(upload_id: str):
     return result
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=5001)
+    # Railway provides PORT environment variable
+    port = int(os.environ.get("PORT", 5001))
+    print(f"🚀 Starting server on port {port}")
+    print(f"🌐 Environment: {os.environ.get('RAILWAY_ENVIRONMENT', 'local')}")
+    uvicorn.run(app, host="0.0.0.0", port=port)

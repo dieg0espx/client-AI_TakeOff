@@ -128,7 +128,7 @@ def extract_count_from_output(step_name, output):
 
 
 
-def update_data_json(step_counts):
+def update_data_json(step_counts, upload_id=None):
     """
     Update data.json with the collected step counts and Cloudinary URLs
     """
@@ -140,6 +140,10 @@ def update_data_json(step_counts):
                 data = json.load(f)
         else:
             data = {}
+        
+        # Add upload_id if provided
+        if upload_id:
+            data["upload_id"] = upload_id
         
         # Add step results section
         data["step_results"] = step_counts
@@ -219,7 +223,7 @@ def check_prerequisites():
     print("✅ All required files found")
     return True
 
-def main():
+def main(upload_id=None):
     """
     Main orchestrator function that runs all processing steps
     """
@@ -280,7 +284,7 @@ def main():
         
         # Update data.json with the collected counts
         if step_counts:
-            if update_data_json(step_counts):
+            if update_data_json(step_counts, upload_id):
                 print("✅ Step counts successfully stored in data.json")
             else:
                 print("⚠️  Failed to store step counts in data.json")
