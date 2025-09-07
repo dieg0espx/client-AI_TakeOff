@@ -158,7 +158,12 @@ app.add_middleware(
 # Root endpoint
 @app.get("/")
 async def root():
-    return {"message": "AI-Takeoff Server is running!", "status": "running"}
+    return {
+        "message": "AI-Takeoff Server is running!", 
+        "status": "running",
+        "version": "2.0.0-docker",
+        "deployment": "docker-with-dependencies"
+    }
 
 # Health check endpoint
 @app.get("/health")
@@ -201,6 +206,71 @@ async def health_check():
         health_status["dependencies"]["cloudinary"] = {"status": "error", "error": str(e)}
     
     return health_status
+
+# Debug endpoint to check system dependencies
+@app.get("/debug/dependencies")
+async def debug_dependencies():
+    """Debug endpoint to check what's actually installed"""
+    import subprocess
+    import os
+    
+    debug_info = {
+        "environment": {
+            "QT_QPA_PLATFORM": os.environ.get('QT_QPA_PLATFORM'),
+            "MPLBACKEND": os.environ.get('MPLBACKEND'),
+            "FONTCONFIG_PATH": os.environ.get('FONTCONFIG_PATH'),
+            "DISPLAY": os.environ.get('DISPLAY'),
+        },
+        "system_commands": {},
+        "python_packages": {},
+        "library_files": {}
+    }
+    
+    # Check system commands
+    commands = ['tesseract', 'fontconfig']
+    for cmd in commands:
+        try:
+            result = subprocess.run(['which', cmd], capture_output=True, text=True)
+            debug_info["system_commands"][cmd] = {
+                "found": result.returncode == 0,
+                "path": result.stdout.strip() if result.returncode == 0 else None,
+                "error": result.stderr.strip() if result.returncode != 0 else None
+            }
+        except Exception as e:
+            debug_info["system_commands"][cmd] = {"error": str(e)}
+    
+    # Check Python packages
+    packages = ['cv2', 'pytesseract', 'cairosvg', 'PIL', 'numpy']
+    for pkg in packages:
+        try:
+            module = __import__(pkg)
+            version = getattr(module, '__version__', 'unknown')
+            debug_info["python_packages"][pkg] = {
+                "imported": True,
+                "version": version
+            }
+        except Exception as e:
+            debug_info["python_packages"][pkg] = {
+                "imported": False,
+                "error": str(e)
+            }
+    
+    # Check library files
+    import glob
+    library_patterns = [
+        ('/usr/lib*/libGL*', 'OpenGL'),
+        ('/usr/lib*/libcairo*', 'Cairo'),
+        ('/usr/lib*/libfontconfig*', 'Fontconfig')
+    ]
+    
+    for pattern, name in library_patterns:
+        files = glob.glob(pattern)
+        debug_info["library_files"][name] = {
+            "found": len(files) > 0,
+            "files": files[:5] if files else []  # Limit to first 5 files
+        }
+    
+    return debug_info
 
 
 # AI-Takeoff specific endpoint
